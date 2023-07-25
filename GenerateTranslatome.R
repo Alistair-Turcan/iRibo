@@ -68,7 +68,7 @@ FDR  <- as.numeric(getArg(parsedArgs, "FDR", "0.05", FALSE))
 
 library(scales)
 library(parallel)
-if (!requireNamespace("ggplot2", quietly = TRUE)) {
+if (!requireNamespace("codetools", quietly = TRUE)) {
 	install.packages("codetools")
 }
 
@@ -93,6 +93,7 @@ calc_binom_false <- function(i) {
   temp_call <- calls[i,]
   scrambled_sum = temp_call$scrambled_sum
   #scrambled_sum =  temp_call$scrambled0 + temp_call$scrambled1 + temp_call$scrambled2
+  #scrambled_sum =  temp_call$scrambled_reads0 + temp_call$scrambled_reads1 + temp_call$scrambled_reads2
   if ( scrambled_sum> 0) {
 		return(binom.test(temp_call$scrambled0, scrambled_sum, 1/3, alt = "g")[[3]])
  } else {
@@ -121,7 +122,9 @@ calc_binom_true <- function(i) {
   temp_call <- calls[i,]
   frame_sum=temp_call$frame_sum
   #frame_sum=temp_call$frame0 + temp_call$frame1 + temp_call$frame2
-  if ( temp_call$frame_sum > 0) {
+  #frame_sum=temp_call$reads0 + temp_call$reads1 + temp_call$reads2
+
+  if ( frame_sum > 0) {
 
 		return(binom.test(temp_call$frame0, frame_sum, 1/3, alt = "g")[[3]])
 	
@@ -155,9 +158,11 @@ noncanonical_index <- which(orfs$gene_id == "")
 if(exclude_overlap_gene == "true"){
 	print("Excluding Overlapping nORFs")
 	noncanonical_index <- intersect(noncanonical_index, which(orfs$CDS_intersect == "X"))
+
 }
 print(length(noncanonical_index))
 noncanonical_index <- intersect(noncanonical_index, which(!(orfs$chr_str %in% exclude_chr)))
+canonical_index <- intersect(canonical_index, which(!(orfs$chr_str %in% exclude_chr)))
 print(length(noncanonical_index))
 
 #noncanonical_index <- candidate_index[which(!(orfs$orf_class[candidate_index] %in% c("Verified", "Uncharacterized", "transposable_element_gene")))]
@@ -254,46 +259,58 @@ png(plot_output)
 plot(f1c)
 dev.off()
 
-noncanonical_trans<-noncanonical_index[which(ribo_bin[noncanonical_index]<.008)]
 
 print(Sys.time() - time1)
 time1 = Sys.time()
 
 #Print the indices to a file
-noncan_indices <- noncanonical_index[which(ribo_bin[noncanonical_index] < my_p)] - 1
+noncan_indices <- noncanonical_index[which(ribo_bin[noncanonical_index] < my_p)]
 write.table(noncan_indices, "orf_indices", col.names=FALSE, row.names=FALSE, quote=FALSE)
 
-canon_indices <- canonical_index[which(ribo_bin[canonical_index] < my_p_canon)] - 1
+canon_indices <- canonical_index[which(ribo_bin[canonical_index] < my_p_canon)]
 write.table(canon_indices, "orf_indices_can", col.names=FALSE, row.names=FALSE, quote=FALSE)
 
 # Write each ORF that is indicated in noncan_indices to a file
 translated_nORFs <- orfs[noncan_indices, ]
 
 # Extract 'in-frame reads' values corresponding to the noncan_indices
-in_frame_reads <- sapply(noncan_indices + 1, function(i) calls[i,]$reads0)
+in_frame_reads <- sapply(noncan_indices, function(i) calls[i,]$reads0)
 
 # Add 'in-frame reads' column to the dataframe
 translated_nORFs$in_frame_reads <- in_frame_reads
 
-##DO THE SAME FOR cORFs
 
 # Add 'Expression Level' column to the dataframe
 translated_nORFs$Expression_Level <- translated_nORFs$in_frame_reads / translated_nORFs$orf_length
 
+# Extract 'p-values' values corresponding to the noncan_indices
+p_values <- ribo_bin[noncan_indices]
+
+# Add 'p-values' column to the dataframe
+translated_nORFs$p_value <- p_values
+
 nORF_output = paste(output_dir, "translated_nORFs.csv", sep = "")
 write.csv(translated_nORFs, nORF_output, row.names=FALSE)
+
+##DO THE SAME FOR cORFs
 
 # Write each ORF that is indicated in canon_indices to a file
 translated_cORFs <- orfs[canon_indices, ]
 
 # Extract 'in-frame reads' values corresponding to the canon_indices
-in_frame_reads <- sapply(canon_indices + 1, function(i) calls[i,]$reads0)
+in_frame_reads <- sapply(canon_indices, function(i) calls[i,]$reads0)
 
 # Add 'in-frame reads' column to the dataframe
 translated_cORFs$in_frame_reads <- in_frame_reads
 
 # Add 'Expression Level' column to the dataframe
 translated_cORFs$Expression_Level <- translated_cORFs$in_frame_reads / translated_cORFs$orf_length
+
+# Extract 'p-values' values corresponding to the canon_indices
+p_values <- ribo_bin[canon_indices]
+
+# Add 'p-values' column to the dataframe
+translated_cORFs$p_value <- p_values
 
 cORF_output = paste(output_dir, "translated_cORFs.csv", sep = "")
 write.csv(translated_cORFs, cORF_output, row.names=FALSE)
