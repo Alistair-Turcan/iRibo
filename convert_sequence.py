@@ -1,26 +1,26 @@
 # Define the mapping of old values to new values
 conversion_map = {
     ">ref|NC_001133| [org=Saccharomyces cerevisiae] [strain=S288C] [moltype=genomic] [chromosome=I]": ">chr1",
-    ">CHR2.19980913 Chromosome II Sequence": ">chr2",
-    ">CHR3.19980521 Chromosome III Sequence": ">chr3",
-    ">CHR4.19990210 Chromosome IV Sequence": ">chr4",
-    ">CHR5.19970727 Chromosome V Sequence": ">chr5",
-    ">CHR6.19970727 Chromosome VI Sequence": ">chr6",
-    ">CHR7.19970703 Chromosome VII Sequence": ">chr7",
-    ">CHR8.19970727 Chromosome VIII Sequence": ">chr8",
+    ">ref|NC_001134| [org=Saccharomyces cerevisiae] [strain=S288C] [moltype=genomic] [chromosome=II]": ">chr2",
+    ">ref|NC_001135| [org=Saccharomyces cerevisiae] [strain=S288C] [moltype=genomic] [chromosome=III]": ">chr3",
+    ">ref|NC_001136| [org=Saccharomyces cerevisiae] [strain=S288C] [moltype=genomic] [chromosome=IV]": ">chr4",
+    ">ref|NC_001137| [org=Saccharomyces cerevisiae] [strain=S288C] [moltype=genomic] [chromosome=V]": ">chr5",
+    ">ref|NC_001138| [org=Saccharomyces cerevisiae] [strain=S288C] [moltype=genomic] [chromosome=VI]": ">chr6",
+    ">ref|NC_001139| [org=Saccharomyces cerevisiae] [strain=S288C] [moltype=genomic] [chromosome=VII]": ">chr7",
+    ">ref|NC_001140| [org=Saccharomyces cerevisiae] [strain=S288C] [moltype=genomic] [chromosome=VIII]": ">chr8",
     ">ref|NC_001141| [org=Saccharomyces cerevisiae] [strain=S288C] [moltype=genomic] [chromosome=IX]": ">chr9",
-    ">CHR10.19970727 Chromosome X Sequence": ">chr10",
-    ">CHR11.19970727 Chromosome XI Sequence": ">chr11",
-    ">CHR12.19970730 Chromosome XII Sequence": ">chr12",
+    ">ref|NC_001142| [org=Saccharomyces cerevisiae] [strain=S288C] [moltype=genomic] [chromosome=X]": ">chr10",
+    ">ref|NC_001143| [org=Saccharomyces cerevisiae] [strain=S288C] [moltype=genomic] [chromosome=XI]": ">chr11",
+    ">ref|NC_001144| [org=Saccharomyces cerevisiae] [strain=S288C] [moltype=genomic] [chromosome=XII]": ">chr12",
     ">ref|NC_001145| [org=Saccharomyces cerevisiae] [strain=S288C] [moltype=genomic] [chromosome=XIII]": ">chr13",
     ">ref|NC_001146| [org=Saccharomyces cerevisiae] [strain=S288C] [moltype=genomic] [chromosome=XIV]": ">chr14",
-    ">CHR15.19970811 Chromosome XV Sequence": ">chr15",
+    ">ref|NC_001147| [org=Saccharomyces cerevisiae] [strain=S288C] [moltype=genomic] [chromosome=XV]": ">chr15",
     ">ref|NC_001148| [org=Saccharomyces cerevisiae] [strain=S288C] [moltype=genomic] [chromosome=XVI]": ">chr16",
     ">ref|NC_001224| [org=Saccharomyces cerevisiae] [strain=S288C] [moltype=genomic] [location=mitochondrion] [top=circular]": ">chrM"
 }
 
 # Input and output file names
-input_file = 'S288C_reference_sequence_R9-1-1_19990210.fsa'
+input_file = 'S288C_reference_sequence_R64-3-1_20210421.fsa'
 output_file = 'S288C_sequence_iRibo.fsa'
 
 # Read the input file, process lines, and write to the output file
