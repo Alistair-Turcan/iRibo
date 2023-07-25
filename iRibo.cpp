@@ -927,6 +927,7 @@ void get_orfs_genome(vector<CandidateORF> &orfs, vector<string> &genome, int thr
 		rev_chr_labels[it->second]=it->first;
 	}
 	
+
 	//Holds both forward and reverse
 	vector<string> double_genome;
 	for(string sequence : genome){
@@ -934,16 +935,19 @@ void get_orfs_genome(vector<CandidateORF> &orfs, vector<string> &genome, int thr
 		reverse_complement(sequence);
 		double_genome.emplace_back(sequence);
 	}
-	
-	
+
 	//Create the double genome, and use onwards
 	
 	
     threads = std::min(threads, static_cast<int>(double_genome.size()));
+	cout <<"\nNum threads: " << to_string(omp_get_max_threads());
+
     #pragma omp parallel for num_threads(threads) schedule(dynamic)
     for (int chr = 0; chr < double_genome.size(); chr++){
 		map<int, int> prev_stops;
+
 		
+		//hi
         string& chromosome_seq = double_genome[chr];
 		int seq_size = chromosome_seq.size();
 		int strand = chr%2;
@@ -1017,6 +1021,7 @@ void get_orfs_genome(vector<CandidateORF> &orfs, vector<string> &genome, int thr
             }
         }
     }
+	
 }
 
 
@@ -1458,89 +1463,44 @@ void find_intersect_ann(vector<CandidateORF> &orfs, vector<GTF> &anns, map<strin
 }
 
 
+
 void assemble_cds(map<string,CDS> &cds,const vector<GTF> &gtfs)
 {
 	map<string,map<int,int>> cds_exons;
-	for(int i=0;i<gtfs.size();i++)
+	int n = gtfs.size();
+
+	for(int i=0;i<n;i++)
 	{
-		if(gtfs[i].annotation_type=="CDS")
+		const GTF& curr_gtf = gtfs[i];
+		
+		if(curr_gtf.annotation_type=="CDS")
 		{
-			string cds_id=gtfs[i].ccds_id;
-			if(gtfs[i].ccds_id=="")
+			string cds_id=curr_gtf.ccds_id;
+			if(cds_id=="")
 			{
-				cds_id=gtfs[i].transcript_id;
+				cds_id=curr_gtf.transcript_id;
 			}
-			cds[cds_id].exon_starts[gtfs[i].exon_number]=gtfs[i].start;
-			cds[cds_id].exon_stops[gtfs[i].exon_number]=gtfs[i].end;	
-			if(cds[cds_id].start==-1 || gtfs[i].start<cds[cds_id].start)
+			int start = curr_gtf.start;
+			int end = curr_gtf.end;
+			int exon_number = curr_gtf.exon_number;
+
+			CDS& curr_cds = cds[cds_id];
+			curr_cds.exon_starts[exon_number]=start;
+			curr_cds.exon_stops[exon_number]=end;
+			if(curr_cds.start==-1 || start<curr_cds.start)
 			{
-				cds[cds_id].start=gtfs[i].start;
+				curr_cds.start=start;
 			}
-			if(cds[cds_id].end==-1 || gtfs[i].end>cds[cds_id].end)
+			if(curr_cds.end==-1 || end>curr_cds.end)
 			{
-				cds[cds_id].end=gtfs[i].end;
+				curr_cds.end=end;
 			}
+			
 		}
 	}
 }
-void assemble_cdsjjj(map<string,CDS> &cds,const vector<GTF> &gtfs, int threads)
-{
 
-    vector<map<string,CDS>> cds_per_thread(threads);
 
-    #pragma omp parallel for num_threads(threads)
-    for(int i=0; i<gtfs.size(); i++)
-    {
-        const GTF &gtf = gtfs[i];
-
-        if(gtf.annotation_type=="CDS")
-        {
-            string cds_id = gtf.ccds_id;
-            if(gtf.ccds_id=="")
-            {
-                cds_id = gtf.transcript_id;
-            }
-
-            int thread_id = omp_get_thread_num();
-
-            cds_per_thread[thread_id][cds_id].exon_starts[gtf.exon_number] = gtf.start;
-            cds_per_thread[thread_id][cds_id].exon_stops[gtf.exon_number] = gtf.end;
-
-            if(cds_per_thread[thread_id][cds_id].start == -1 || gtf.start < cds_per_thread[thread_id][cds_id].start)
-            {
-                cds_per_thread[thread_id][cds_id].start = gtf.start;
-            }
-
-            if(cds_per_thread[thread_id][cds_id].end == -1 || gtf.end > cds_per_thread[thread_id][cds_id].end)
-            {
-                cds_per_thread[thread_id][cds_id].end = gtf.end;
-            }
-        }
-    }
-
-    // Merge maps from all threads
-    for(auto &cds_thread : cds_per_thread)
-    {
-        for(auto &pair : cds_thread)
-        {
-            CDS &cds_main = cds[pair.first];
-            CDS &cds_thread = pair.second;
-
-            cds_main.exon_starts.insert(cds_thread.exon_starts.begin(), cds_thread.exon_starts.end());
-            cds_main.exon_stops.insert(cds_thread.exon_stops.begin(), cds_thread.exon_stops.end());
-
-            if(cds_main.start == -1 || cds_thread.start < cds_main.start)
-            {
-                cds_main.start = cds_thread.start;
-            }
-
-            if(cds_main.end == -1 || cds_thread.end > cds_main.end)
-            {
-                cds_main.end = cds_thread.end;
-            }
-        }
-    }
-}
 
 
 void read_sam_file(string filename, map<string, int> &chr_labels, int threads, vector<string> & sam_lines)
@@ -1984,7 +1944,7 @@ void read_annotated_genes(vector<GeneModel>& genes, string filename)
 		}
 	}
 }
-void map_reads_to_genome(vector<vector<map<int, int>>> &reads_map_f, vector<vector<map<int, int>>> &reads_map_r, const vector<Read> &reads, int chromosome_count, int threads)
+void map_reads_to_genome_old(vector<vector<map<int, int>>> &reads_map_f, vector<vector<map<int, int>>> &reads_map_r, const vector<Read> &reads, int chromosome_count, int threads)
 {
     int count = 0;
     int rm_size = reads_map_f.size();
@@ -1999,21 +1959,89 @@ void map_reads_to_genome(vector<vector<map<int, int>>> &reads_map_f, vector<vect
         {
             if (my_read.strand == 0)
             {
-                #pragma omp atomic
+                #pragma omp critical
 				{
 					reads_map_f[my_read.length][my_read.chr][my_read.start] += 1;
 				}
             }
             else if (my_read.strand == 1)
             {
-                #pragma omp atomic
-				{
-					
+                #pragma omp critical
+				{				
 					reads_map_r[my_read.length][my_read.chr][my_read.start] += 1;
 				}
             }
         }
     }
+}
+void map_reads_to_genome(vector<vector<map<int, int>>> &reads_map_f, vector<vector<map<int, int>>> &reads_map_r, const vector<Read> &reads, int chromosome_count, int threads)
+{
+    int count = 0;
+    int rm_size = reads_map_f.size();
+    reads_map_f = vector<vector<map<int, int>>>(40, vector<map<int, int>>(chromosome_count));
+    reads_map_r = vector<vector<map<int, int>>>(40, vector<map<int, int>>(chromosome_count));
+
+    vector<vector<map<int, int>>> local_reads_map_f[threads];
+    vector<vector<map<int, int>>> local_reads_map_r[threads];
+    
+    for (int i = 0; i < threads; ++i)
+    {
+        local_reads_map_f[i] = vector<vector<map<int, int>>>(40, vector<map<int, int>>(chromosome_count));
+        local_reads_map_r[i] = vector<vector<map<int, int>>>(40, vector<map<int, int>>(chromosome_count));
+    }
+
+    #pragma omp parallel for num_threads(threads)
+    for (int i = 0; i < reads.size(); i++)
+    {
+        int tid = omp_get_thread_num();
+        Read my_read = reads[i];
+        if (my_read.length >= 0 && my_read.length < rm_size)
+        {
+            if (my_read.strand == 0)
+            {
+                local_reads_map_f[tid][my_read.length][my_read.chr][my_read.start] += 1;
+            }
+            else if (my_read.strand == 1)
+            {
+                local_reads_map_r[tid][my_read.length][my_read.chr][my_read.start] += 1;
+            }
+        }
+    }
+
+	// Combine results from all threads
+	for (int t = 0; t < threads; ++t)
+	{
+		for (int len = 0; len < 40; ++len)
+		{
+			auto& len_map_f = reads_map_f[len];
+			auto& len_map_r = reads_map_r[len];
+
+			for (int chr = 0; chr < chromosome_count; ++chr)
+			{
+				auto& chr_map_f = len_map_f[chr];
+				auto& chr_map_r = len_map_r[chr];
+
+				#pragma omp parallel sections num_threads(2)
+				{
+					#pragma omp section
+					{
+						for (auto& item : local_reads_map_f[t][len][chr])
+						{
+							chr_map_f[item.first] += item.second;
+						}
+					}
+					#pragma omp section
+					{
+						for (auto& item : local_reads_map_r[t][len][chr])
+						{
+							chr_map_r[item.first] += item.second;
+						}
+					}
+				}
+			}
+		}
+	}
+
 }
 
 int find_p_site(vector<GeneModel> &orfs, vector<map<int, int>> &reads_map)
@@ -2529,31 +2557,39 @@ void accumulate_reads(int threads,
     // Set the number of threads
     omp_set_num_threads(threads);
 
-    #pragma omp parallel for schedule(dynamic)
     for (int chr = 0; chr < chr_labels.size(); chr++)
     {
-
         auto& all_passed_reads_f_chr = all_passed_reads_f[chr];
         auto& all_passed_reads_r_chr = all_passed_reads_r[chr];
 
 		auto& reads_map_f_chr = reads_map_f[chr];
 		auto& reads_map_r_chr = reads_map_r[chr];
-		//#pragma omp critical
+
+		#pragma omp parallel sections num_threads(2)
 		{
-			for (auto it = reads_map_f_chr.begin(); it != reads_map_f_chr.end(); ++it)
+			#pragma omp section
 			{
-				all_passed_reads_f_chr[it->first-p_site_f] += it->second;
+
+				for (auto it = reads_map_f_chr.begin(); it != reads_map_f_chr.end(); ++it)
+				{
+					all_passed_reads_f_chr[it->first-p_site_f] += it->second;
+				}
+				
 			}
-			for (auto it = reads_map_r_chr.begin(); it != reads_map_r_chr.end(); ++it)
+			#pragma omp section
 			{
-				all_passed_reads_r_chr[it->first-p_site_r] += it->second;
+
+				for (auto it = reads_map_r_chr.begin(); it != reads_map_r_chr.end(); ++it)
+				{
+					all_passed_reads_r_chr[it->first-p_site_r] += it->second;
+				}
+				
 			}
 		}
 		
 	}
-
-
 }
+
 void outputTracks(vector<map<int,int>>& passed_reads_f, vector<map<int,int>>& passed_reads_r, vector<GeneModel>& orfs, map<string, int>& chr_labels, string& output_dir){
 
     // Construct rev_chr_labels once
@@ -2669,6 +2705,7 @@ if(runMode=="GetCandidateORFs")
     std::chrono::duration<double> elapsed;
     
 	int threads = stoi(getArg(parseArgs, "Threads", "1", false));
+	cout <<"\nNum threads: " << to_string(threads);
 	string output_dir = getArg(parseArgs, "Output", "", false);
 	if(output_dir.size()!=0){
 		create_dir(output_dir);
@@ -2969,8 +3006,14 @@ if(runMode=="GetCandidateORFs")
 
 			#pragma omp parallel for num_threads(threads)
 			for(int j=start; j<=stop; j++){
-				p_sites_f[j-start] = find_p_site(canonical_orfs, reads_map_f[j]);
-				p_sites_r[j-start] = find_p_site_rc(canonical_orfs, reads_map_r[j]);
+				int pf = find_p_site(canonical_orfs, reads_map_f[j]);
+				int pr = find_p_site_rc(canonical_orfs, reads_map_r[j]);
+				
+				#pragma omp critical
+				{
+					p_sites_f[j-start] = pf;
+					p_sites_r[j-start] = pr;
+				}
 
 			}
 			
