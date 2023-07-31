@@ -231,7 +231,7 @@ orfs_found = num_hits_noncanonical[my_p*10000]
 orfs_found_canon = num_hits_canonical[my_p_canon*10000]
 
 my_title = paste("P-value: ", my_p)
-my_title = paste(my_title, " Orfs Found: ")
+my_title = paste(my_title, " ORFs Found: ")
 my_title = paste(my_title, orfs_found)
 
 f1c<- ggplot(df_hits,aes(x=pvals,y=hits,linetype=hit_type))+
@@ -279,7 +279,6 @@ in_frame_reads <- sapply(noncan_indices, function(i) calls[i,]$reads0)
 # Add 'in-frame reads' column to the dataframe
 translated_nORFs$in_frame_reads <- in_frame_reads
 
-
 # Add 'Expression Level' column to the dataframe
 translated_nORFs$Expression_Level <- translated_nORFs$in_frame_reads / translated_nORFs$orf_length
 
@@ -289,8 +288,8 @@ p_values <- ribo_bin[noncan_indices]
 # Add 'p-values' column to the dataframe
 translated_nORFs$p_value <- p_values
 
-nORF_output = paste(output_dir, "translated_nORFs.csv", sep = "")
-write.csv(translated_nORFs, nORF_output, row.names=FALSE)
+output = paste(output_dir, "translated_orfs.csv", sep = "")
+write.table(translated_nORFs, output, sep=",", row.names=FALSE, col.names = TRUE)
 
 ##DO THE SAME FOR cORFs
 
@@ -312,6 +311,7 @@ p_values <- ribo_bin[canon_indices]
 # Add 'p-values' column to the dataframe
 translated_cORFs$p_value <- p_values
 
-cORF_output = paste(output_dir, "translated_cORFs.csv", sep = "")
-write.csv(translated_cORFs, cORF_output, row.names=FALSE)
+# Append cORFs to the same file as nORFs
+write.table(translated_cORFs, output, sep=",", row.names=FALSE, col.names = FALSE, append=TRUE)
+
 

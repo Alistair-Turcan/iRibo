@@ -4,18 +4,17 @@
 #include <fstream>
 #include <sstream>
 #include <iostream>
-#include <dirent.h>
 #include <cstring>
 #include <memory>
 #include <random>
 #include <algorithm>
 #include <set>
 #include <string_view>
-#include <thread>
 #include <chrono>
 #include <omp.h>
 #include <array>
 #include <filesystem>
+#include <dirent.h>
 
 using namespace std;
 using namespace std::chrono;
@@ -1243,7 +1242,9 @@ void expand_candidate_orfs(vector<CandidateORF> &gene_models, int threads)
 
 void expand_gene_models(vector<GeneModel> &gene_models, int threads)
 {
-
+	/*
+		Each ORF has a frames variable, which indicates what frame, 0,1,2 each position is. 4 indicates intron.
+	*/
 	#pragma omp parallel for num_threads(threads)
 	for (int i = 0; i < gene_models.size(); i++)
 	{
@@ -1255,6 +1256,7 @@ void expand_gene_models(vector<GeneModel> &gene_models, int threads)
 
 			gene_model.frame = vector<int>(1 + gene_model.stop_codon_pos - gene_model.start_codon_pos, 4);
 
+			//Reverse strand is processed in reverse
 			int cur_frame = 0;
 			int start = (gene_model.strand == 0) ? 0 : gene_model.exons.size()-1;
 			int end = (gene_model.strand == 0) ? gene_model.exons.size() : -1;
@@ -1506,8 +1508,8 @@ void assemble_cds(map<string,CDS> &cds,const vector<GTF> &gtfs)
 void read_sam_file(string filename, map<string, int> &chr_labels, int threads, vector<string> & sam_lines)
 {
 	string real_filename = filename;
+	
 	//Convert bam to sam, use sam
-
 	std::string command_1 = "samtools view -@ " + std::to_string(threads) + " -h -o " + filename.substr(0, filename.length()-4) + ".sam " + filename;
 	const char* command = command_1.c_str();
 	if (filename.substr(filename.length()-4) == ".bam"){
@@ -1520,19 +1522,20 @@ void read_sam_file(string filename, map<string, int> &chr_labels, int threads, v
 	string line;
 	int index =0;
 
+	//Build list of lines, will be processed in a different method
 	while (getline(file, line))
 	{
 		sam_lines.emplace_back(line);
 	}
 
-	//Convert bam to sam, use sam
+	//Delete the temporary sam file
 	if (real_filename.substr(real_filename.length()-4) == ".bam"){
 		system(("rm " + filename).c_str());
 	}
 
 }
 
-void process_sam_lines(vector<Read> &reads, string filename, map<string, int> &chr_labels, vector<string> &sam_lines, int threads)
+void process_sam_lines(vector<Read> &reads, map<string, int> &chr_labels, vector<string> &sam_lines, int threads)
 {
     #pragma omp parallel for num_threads(threads)
     for (int i = 0; i < sam_lines.size(); i++)
@@ -1543,16 +1546,17 @@ void process_sam_lines(vector<Read> &reads, string filename, map<string, int> &c
             vector<string> cols;
             split(line, '\t', cols);
             string chr_str = cols[2];
-            //if (chr_labels.count(chr_str))
-            //{
+            if (chr_labels.count(chr_str))
+            {
                 Read my_read = Read();
                 my_read.chr = chr_labels[chr_str];
                 my_read.start = stoi(cols[3]);
 
                 int flag = stoi(cols[1]);
                 my_read.flag = flag;
-                    my_read.length = cols[9].size();
+                my_read.length = cols[9].size();
 
+				//Reverse strand read
                 if (flag & 16)
                 {
                     my_read.strand = 1;
@@ -1567,7 +1571,7 @@ void process_sam_lines(vector<Read> &reads, string filename, map<string, int> &c
 				{
 					reads[i] = my_read;
 				}
-            //}
+            }
         }
         sam_lines[i] = "";
     }
@@ -1944,36 +1948,7 @@ void read_annotated_genes(vector<GeneModel>& genes, string filename)
 		}
 	}
 }
-void map_reads_to_genome_old(vector<vector<map<int, int>>> &reads_map_f, vector<vector<map<int, int>>> &reads_map_r, const vector<Read> &reads, int chromosome_count, int threads)
-{
-    int count = 0;
-    int rm_size = reads_map_f.size();
-    reads_map_f = vector<vector<map<int, int>>>(40, vector<map<int, int>>(chromosome_count));
-    reads_map_r = vector<vector<map<int, int>>>(40, vector<map<int, int>>(chromosome_count));
 
-    #pragma omp parallel for num_threads(threads)
-    for (int i = 0; i < reads.size(); i++)
-    {
-        Read my_read = reads[i];
-        if (my_read.length >= 0 && my_read.length < rm_size)
-        {
-            if (my_read.strand == 0)
-            {
-                #pragma omp critical
-				{
-					reads_map_f[my_read.length][my_read.chr][my_read.start] += 1;
-				}
-            }
-            else if (my_read.strand == 1)
-            {
-                #pragma omp critical
-				{				
-					reads_map_r[my_read.length][my_read.chr][my_read.start] += 1;
-				}
-            }
-        }
-    }
-}
 void map_reads_to_genome(vector<vector<map<int, int>>> &reads_map_f, vector<vector<map<int, int>>> &reads_map_r, const vector<Read> &reads, int chromosome_count, int threads)
 {
     int count = 0;
@@ -2044,10 +2019,10 @@ void map_reads_to_genome(vector<vector<map<int, int>>> &reads_map_f, vector<vect
 
 }
 
-int find_p_site(vector<GeneModel> &orfs, vector<map<int, int>> &reads_map)
+int find_p_site(vector<GeneModel> &orfs, vector<map<int, int>> &reads_map, int p_site_distance)
 {
-	int nearby_len = 40;
-	int displacement = 20;
+	int nearby_len = p_site_distance;
+	int displacement = p_site_distance/2;
 	int total_reads = 0;
 
 	vector<int> nearby(nearby_len);
@@ -2117,10 +2092,10 @@ int find_p_site(vector<GeneModel> &orfs, vector<map<int, int>> &reads_map)
 	return predicted_p_site;
 }
 
-int find_p_site_rc(vector<GeneModel> &orfs, vector<map<int, int>> &reads_map)
+int find_p_site_rc(vector<GeneModel> &orfs, vector<map<int, int>> &reads_map, int p_site_distance)
 {
-	int nearby_len = 40;
-	int displacement = 20;
+	int nearby_len = p_site_distance;
+	int displacement = p_site_distance/2;
 	int total_reads = 0;
 
 	vector<int> nearby(nearby_len);
@@ -2246,7 +2221,7 @@ void filter_orfs(vector<CandidateORF> &gene_models, int threads)
 	gene_models = move(filtered_gene_models);
 }
 
-void read_riboseq_studies(vector<Study> &studies, string filename)
+void read_riboseq_studies(vector<string> &studies, string filename)
 {
 	ifstream file(filename);
 	string line;
@@ -2256,15 +2231,8 @@ void read_riboseq_studies(vector<Study> &studies, string filename)
 		{
 			vector<string> columns;
 			split(line, ' ', columns);
-			studies.push_back(Study());
-			studies.back().path = columns[0];
+			studies.emplace_back(columns[0]);
 		}        
-		//studies.back().srr = columns[1];
-		//studies.back().preprocessed = stoi(columns[3]);
-		//if (!studies.back().preprocessed)
-		//{
-		//	studies.back().linker = columns[4];
-		//}
 	}
 }
 
@@ -2289,8 +2257,7 @@ void get_orf_chr_str(vector<CandidateORF> &orfs, map<string,int> &chr_labels, in
 
 
 
-bool quality_control(vector<GeneModel> &orfs, vector<map<int, int>> &reads_map_f, vector<map<int, int>> &reads_map_r, int p_site_f, int p_site_r, int threads, bool qc_positions) {
-    vector<int> ann_frames(3, 0);
+bool quality_control(vector<GeneModel> &orfs, vector<map<int, int>> &reads_map_f, vector<map<int, int>> &reads_map_r, int p_site_f, int p_site_r, int threads, bool qc_positions, vector<int>& ann_frames) {
 
     #pragma omp parallel for num_threads(threads)
     for (int i = 0; i < orfs.size(); i++) {
@@ -2346,8 +2313,6 @@ bool quality_control(vector<GeneModel> &orfs, vector<map<int, int>> &reads_map_f
             }
         }
     }
-
-    cout << "\nAnn frames: " << to_string(ann_frames[0]) << " " << to_string(ann_frames[1]) << " " << to_string(ann_frames[2]);
     
     //std::sort(ann_frames.begin(), ann_frames.end(), std::greater<int>());
     if(ann_frames[0]< 10000){
@@ -2408,7 +2373,7 @@ void assign_reads_to_orfs(vector<GeneModel> &all_orfs, vector<map<int, int>> &re
 
 
 		vector<int> exon_pos_reads (my_orf.stop_codon_pos - my_orf.start_codon_pos + 1);
-		my_orf.pos_read_count = vector<int>(my_orf.stop_codon_pos - my_orf.start_codon_pos + 1);
+		//my_orf.pos_read_count = vector<int>(my_orf.stop_codon_pos - my_orf.start_codon_pos + 1);
 
 
 
@@ -2425,7 +2390,7 @@ void assign_reads_to_orfs(vector<GeneModel> &all_orfs, vector<map<int, int>> &re
 
 				if (my_map.find(j)!= my_map_end) {
 					exon_pos_reads[j-my_orf.start_codon_pos] = (my_map[j]);
-					my_orf.pos_read_count[j-my_orf.start_codon_pos]=my_map[j];
+					//my_orf.pos_read_count[j-my_orf.start_codon_pos]=my_map[j];
 				}
 
 			}
@@ -2441,7 +2406,7 @@ void assign_reads_to_orfs(vector<GeneModel> &all_orfs, vector<map<int, int>> &re
 
 				if (my_map.find(j)!= my_map_end) {
 					exon_pos_reads[my_orf.stop_codon_pos-j] = my_map[j];
-					my_orf.pos_read_count[my_orf.stop_codon_pos-j]=my_map[j];
+					//my_orf.pos_read_count[my_orf.stop_codon_pos-j]=my_map[j];
 
 				}
 
@@ -2471,6 +2436,7 @@ void assign_reads_to_orfs(vector<GeneModel> &all_orfs, vector<map<int, int>> &re
 			my_orf.frame_reads[2]+=third;
 		}
 		
+		
 		//Find scrambled data
 		shuffle(exon_pos_reads.begin(), exon_pos_reads.end(), engine);
 		//Count triplet pattern
@@ -2486,7 +2452,9 @@ void assign_reads_to_orfs(vector<GeneModel> &all_orfs, vector<map<int, int>> &re
 				my_orf.first_max_scrambled++;
 			}
 			if(first+second+third!=0){
+
 				my_orf.total_frames_scrambled++;
+				
 			}
 			//}
 			my_orf.frame_reads_scrambled[0]+=first;
@@ -2519,7 +2487,7 @@ void assign_reads_to_orfs(vector<GeneModel> &all_orfs, vector<map<int, int>> &re
 		}
 		*/
 		//Clear orf frames for memory efficiency
-		//my_orf.frame = vector<int>();
+		my_orf.frame = vector<int>();
     }
 	
 	
@@ -2557,6 +2525,7 @@ void accumulate_reads(int threads,
     // Set the number of threads
     omp_set_num_threads(threads);
 
+	
     for (int chr = 0; chr < chr_labels.size(); chr++)
     {
         auto& all_passed_reads_f_chr = all_passed_reads_f[chr];
@@ -2705,14 +2674,15 @@ if(runMode=="GetCandidateORFs")
     std::chrono::duration<double> elapsed;
     
 	int threads = stoi(getArg(parseArgs, "Threads", "1", false));
-	cout <<"\nNum threads: " << to_string(threads);
+
 	string output_dir = getArg(parseArgs, "Output", "", false);
 	if(output_dir.size()!=0){
 		create_dir(output_dir);
 		output_dir+="/";
 	}
 	
-    cout << "RUNNING GCO\n";;
+	ofstream log_file(output_dir+"GenerateTranslationProfile.log");
+
     string genome_path = getArg(parseArgs, "Genome", "", true);
     string genome_annotation_path = getArg(parseArgs, "Transcriptome", "", false);
     string canonical_gene_annotation_path = getArg(parseArgs, "Annotations", "", true);
@@ -2882,31 +2852,33 @@ if(runMode=="GetCandidateORFs")
 
 	else if(runMode=="GenerateTranslationProfile")
 	{
-		//to run after running STAR 
+		
+		/*
+		Reads in aligned read files
+		finds p-sites at each read length
+		performs quality control at each read length
+		Assigns those reads to each candidate orf
+		*/
+		
+		string genome_path = getArg(parseArgs, "Genome", "", true); //For identifying chr_labels
+		string riboseq_files_path = getArg(parseArgs, "Riboseq", "", true); //For processing each sam/bam file
+		string candidate_orfs_path = getArg(parseArgs, "CandidateORFs", "", true); //Our list of candidate ORFs (includes canonical)
+		string output_dir = getArg(parseArgs, "Output", "", false); //Where files will be output to
+		
+		
+		int min_length = stoi(getArg(parseArgs, "Min_Length", "25", false)); //Minimum read length tested in each file
+		int max_length = stoi(getArg(parseArgs, "Max_Length", "35", false)); //Maximum read length tested in each file
+		int threads = stoi(getArg(parseArgs, "Threads", "1", false)); //Number of threads to run on
+		//float p_site_factor = stof(getArg(parseArgs, "P_Site_Factor", "0.35", false)); //Used in p-site formula
+		float p_site_distance = stoi(getArg(parseArgs, "P_Site_Distance", "20", false)); //Distance to look for p-site from start codons in metagene profile
+		int cutoff = stoi(getArg(parseArgs, "QC_Count", "10000", false)); //How many reads required per read length to pass quality control
+		float required_frame_difference = stof(getArg(parseArgs, "QC_Periodicity", "2.0", false)); //How many reads required in first frame vs second and third to pass qc.
+		//bool p_site_old = false; //Whether or not to use the p-site formula from the original paper
+		
+		bool qc_positions = stringToBool(getArg(parseArgs, "QC_Positions", "false", false)); //Whether or not to use positions vs read counts in quality control
 
-		string genome_path = getArg(parseArgs, "Genome", "", true);
-		string riboseq_files_path = getArg(parseArgs, "Riboseq", "", true);
-		string candidate_orfs_path = getArg(parseArgs, "CandidateORFs", "", true);
-		string output_dir = getArg(parseArgs, "Output", "", false);
-		
-		
-		int min_length = stoi(getArg(parseArgs, "Min_Length", "25", false));
-		int max_length = stoi(getArg(parseArgs, "Max_Length", "35", false));
-		int threads = stoi(getArg(parseArgs, "Threads", "1", false));
-		float p_site_factor = stof(getArg(parseArgs, "P_Site_Factor", "1.75", false));
-		float p_site_distance = stoi(getArg(parseArgs, "P_Site_Distance", "40", false));
-		int cutoff = stoi(getArg(parseArgs, "QC_Count", "10000", false)); 
-		float required_frame_difference = stof(getArg(parseArgs, "QC_Periodicity", "2.0", false)); 
-		bool p_site_old = false;
-		
-		bool qc_positions = stringToBool(getArg(parseArgs, "QC_Positions", "false", false));
-		
-
-		vector<Study> riboseq_studies;
-		read_riboseq_studies(riboseq_studies, riboseq_files_path);
-		
-		int align_start = 0;
-		int align_end = riboseq_studies.size()-1;
+		//Double distance, because we build metagene_profile from both directions
+		p_site_distance*=2;
 
 
 		if(output_dir.size()!=0){
@@ -2915,170 +2887,174 @@ if(runMode=="GetCandidateORFs")
 			output_dir+="/";
 		}
 
-		
-		
-		cout<<"\nfile indices: "<<align_start<<" "<<align_end<<" "<<argc<<" "<<riboseq_studies.size();
+		ofstream log_file(output_dir+"GenerateTranslationProfile.log");
 
+		
+		vector<string> riboseq_studies;
+		read_riboseq_studies(riboseq_studies, riboseq_files_path);
+		
+		log_file << "Reading " << to_string(riboseq_studies.size()) << " read files from " << riboseq_files_path;
+		
+		if(riboseq_studies.size()==0){
+			string err = "\nNo files specified in " + riboseq_files_path + ". Ensure there are SAM/BAM file paths, separated by new lines. ";
+			cerr << err;
+			log_file << err;
+			exit(0);
+		}
+		
+		//Read in the chromosome labels from the genome
 		map<string, int> chr_labels;
-		read_genome_assign_reads(chr_labels, genome_path);
+		read_genome_assign_reads(chr_labels, genome_path); 
 
+		log_file << "\nRead " << to_string(chr_labels.size()) << " chromosomes from " << genome_path;
+		if(chr_labels.size() == 0){
+			string err = "\nNo chromosomes found in genome " + genome_path + ". Chromosomes should be of the format\n >chromosome_id\n";
+			cerr << err;
+			log_file << err;
+			exit(0);
+		}
 
-
+		//Read in annotated genes for p-site detection and quality control
 		vector<GeneModel> canonical_orfs;
-
-
-		//First we read annotated only, read all later on.
 		read_genes(canonical_orfs, candidate_orfs_path, true);
-		//read_genes(orfs, "orfs");
-		//read_genes_yeast(all_orfs, "orfs_comp");
-		//read_genes_yeast(orfs, "orfs_comp");
 
-		//read_annotated_genes(canonical_orfs, "orf_coding_all.fasta");
+		//cout << "\norfs read: " << canonical_orfs.size();
+
+		log_file << "\nRead " << canonical_orfs.size() << " annotated genes from " << candidate_orfs_path;
 		
-		cout << "\norfs read: " << canonical_orfs.size();
+		if(canonical_orfs.size()==0){
+			string err = "\nNo canonical ORFs read. Cannot perform p-site detection and quality control. Ensure that there exists canonical genes in candidate_orfs.";
+			cerr << err;
+			log_file << err;
+			exit(0);
+		}
+		
 
-
+		//Initialize the frame indexes of each candidate orf
 		expand_gene_models(canonical_orfs, threads);
 
+		//Stores all the total reads
 		vector<map<int,int>> all_passed_reads_f(chr_labels.size());
 		vector<map<int,int>> all_passed_reads_r(chr_labels.size());
 		
 		
-		//Initialize global reads_map variable
-		for (int i = align_start; i <= align_end; i++)
+		//Iterate over each sam file
+		log_file << "\nReading sam files.";
+		for (int i = 0; i < riboseq_studies.size(); i++)
 		{
 		
 
-			cout << "\nprocessing study: " << riboseq_studies[i].path;
+			log_file << "\nProcessing sample: " << riboseq_studies[i];
 
-			auto time3 = high_resolution_clock::now();
 
+			//Read in the sam file, add it to reads vector
 			vector<string> sam_lines;
-			read_sam_file(riboseq_studies[i].path,  chr_labels, threads, sam_lines);
+			read_sam_file(riboseq_studies[i],  chr_labels, threads, sam_lines);
 			vector<Read> reads(sam_lines.size());
+			process_sam_lines(reads, chr_labels, sam_lines, threads);
 
-			process_sam_lines(reads, riboseq_studies[i].path, chr_labels, sam_lines, threads);
 
-
-			cout << "\nreads read: " << reads.size();
+			log_file << "\nRead count: " << to_string(reads.size());
 			
-			auto time4 = high_resolution_clock::now();
-			auto duration = duration_cast<microseconds>(time4 - time3);
-			cout << "Read sam: " << duration.count() << " microseconds" << endl;
 
 
-
+			//Reads maps for this one sample, to be aggregated to all_passed_reads if passing qc
 			vector<vector<map<int, int>>> reads_map_f;//readlength x chromosome x position
 			vector<vector<map<int, int>>> reads_map_r;//readlength x chromosome x position
-
 
 			reads_map_f = vector<vector<map<int, int>>>(max_length,vector<map<int,int>>(chr_labels.size()));
 			reads_map_r = vector<vector<map<int, int>>>(max_length,vector<map<int,int>>(chr_labels.size()));
 
+			//Make reads maps for both, based on reads from sam file.
 			map_reads_to_genome(reads_map_f, reads_map_r, reads, chr_labels.size(), threads);
-
-
-			cout << "\n chr size: " << chr_labels.size();
-
 			
 			
-			auto time5 = high_resolution_clock::now();
-			duration = duration_cast<microseconds>(time5 - time4);
-			cout << "Map reads to genome: " << duration.count() << " microseconds" << endl;
-		
 			reads.clear();
 			
 
+			//Forward and reverse p sites for each length
+			vector<int> p_sites_f(max_length-min_length+1);
+			vector<int> p_sites_r(max_length-min_length+1);
 
-
-
-			int stop = max_length;
-			int start = min_length;
-
-			vector<vector<int>> ann_frames_f(stop-start+1, vector<int>(3,0)); 
-			vector<vector<int>> ann_frames_r(stop-start+1, vector<int>(3,0));
-
-
-
-
-			vector<int> p_sites_f(stop-start+1);
-			vector<int> p_sites_r(stop-start+1);
-
+			//Find the p-sites
 			#pragma omp parallel for num_threads(threads)
-			for(int j=start; j<=stop; j++){
-				int pf = find_p_site(canonical_orfs, reads_map_f[j]);
-				int pr = find_p_site_rc(canonical_orfs, reads_map_r[j]);
+			for(int j=min_length; j<=max_length; j++){
+				int pf = find_p_site(canonical_orfs, reads_map_f[j], p_site_distance);
+				int pr = find_p_site_rc(canonical_orfs, reads_map_r[j], p_site_distance);
 				
 				#pragma omp critical
 				{
-					p_sites_f[j-start] = pf;
-					p_sites_r[j-start] = pr;
+					p_sites_f[j-min_length] = pf;
+					p_sites_r[j-min_length] = pr;
 				}
 
 			}
 			
 			for (int i = 0; i < p_sites_f.size(); i++) {
-				std::cout << "p_sites_f[" << start + i << "] = " << p_sites_f[i] << std::endl;
-				std::cout << "p_sites_r[" << start + i << "] = " << p_sites_r[i] << std::endl;
+				log_file << "\nForward p-site[" << min_length + i << "] = " << to_string(p_sites_f[i]);
+				log_file << "\nReverse p-site[" << min_length + i << "] = " << to_string(p_sites_r[i]);
 			}
 			
-			auto time8 = high_resolution_clock::now();
 
 				
-			for (int j = start; j <= stop; j++)
+			for (int j = min_length; j <= max_length; j++)
 			{
 
-				int p_site_f = p_sites_f[j-start];
-				int p_site_r = p_sites_r[j-start]; 
-				
+				int p_site_f = p_sites_f[j-min_length];
+				int p_site_r = p_sites_r[j-min_length]; 
+				vector<int> ann_frames(3,0);
 
-				int index = j - start;
 
+				int index = j - min_length;
+
+				//Checking if p-sites were detected by formula, and that they match
 				if(p_site_f==-1000 || p_site_r==-1000 || p_site_f-2 != -p_site_r){ //REMEMBER THIS
-					cout << "\nRead length: " << to_string(j) << " skipped due to no p-site";
+					log_file << "\nRead length: " << to_string(j) << " skipped due to no detectable p-site";
 					continue;
 				}
-				if (quality_control(canonical_orfs, reads_map_f[j], reads_map_r[j], p_site_f, p_site_r, threads, qc_positions) == false){
-					cout << "\nRead length: " << to_string(j) << " skipped due to poor quality.";
-
+				
+				//Checking for periodicity and read counts
+				if (quality_control(canonical_orfs, reads_map_f[j], reads_map_r[j], p_site_f, p_site_r, threads, qc_positions, ann_frames) == false){
+					log_file << "\nRead length: " << to_string(j) << " skipped due to poor periodicity in canonical ORFs.";
 					continue;
 				}
-
-
-				//assign_reads_to_orfs(all_orfs, reads_map_f[j],reads_map_r[j], ps[index], rps[index], threads);
+				
+				log_file << "\nRead length: " << to_string(j) << " passed quality control.";
+				log_file << "\nCanonical frames: " << to_string(ann_frames[0]) << " " << to_string(ann_frames[1]) << " " << to_string(ann_frames[2]);
 
 				accumulate_reads(threads, chr_labels, reads_map_f[j], reads_map_r[j], all_passed_reads_f, all_passed_reads_r, p_site_f, p_site_r);
 			}
-
-			
-			auto time9 = high_resolution_clock::now();
-			duration = duration_cast<microseconds>(time9 - time8);
-			cout << "\nMap reads to orfs: " << duration.count() << " microseconds" << endl;
-
-			
-
 
 		}
 		
 		canonical_orfs.clear();
 		
+		//Print every read that passed qc
+		log_file << "\nPrinting all reads.";
+
 		print_all_passed_reads(all_passed_reads_f, output_dir + "all_passed_reads_f",0);
 		print_all_passed_reads(all_passed_reads_r, output_dir + "all_passed_reads_r",1);
 		
 		
 		
+		//Assigning reads to ORFs
 		
-		//Detecting Translation
-		
+		//Read in all ORFs
 		vector<GeneModel> all_orfs;
 		read_genes(all_orfs, candidate_orfs_path, false);
 		expand_gene_models(all_orfs, threads);
+		
 		assign_reads_to_orfs(all_orfs, all_passed_reads_f,all_passed_reads_r, threads);
-		print_gene_reads_new(all_orfs, output_dir + "orfs_reads"); // _"+to_string(align_start)  + "_" + to_string(align_end)  + "_" + to_string(cutoff)  + "_" + to_string(required_frame_difference));
+		//print_gene_reads_new(all_orfs, output_dir + "orfs_reads"); // _"+to_string(align_start)  + "_" + to_string(align_end)  + "_" + to_string(cutoff)  + "_" + to_string(required_frame_difference));
 
-
+		//Print translation statistics, and tracks
+		log_file << "\nPrinting translation_calls.";
 		print_translation_calls(all_orfs,  output_dir + "translation_calls");
+		log_file << "\nPrinting tracks.";
 		outputTracks(all_passed_reads_f, all_passed_reads_r, all_orfs, chr_labels, output_dir);
+
+		log_file << "\nFinished running GenerateTranslationProfile.";
+
 
 	}
 
