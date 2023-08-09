@@ -44,6 +44,7 @@ parsedArgs <- parseArguments(args)
 
 calls_file <- getArg(parsedArgs, "TranslationCalls", "", TRUE)
 orfs_file <- getArg(parsedArgs, "CandidateORFs", "", TRUE)
+null_file <- getArg(parsedArgs, "NullDistribution", "", TRUE)
 
 threads <- as.integer(getArg(parsedArgs, "Threads", "1", FALSE))
 
@@ -63,14 +64,13 @@ if(output_dir!=""){
 #Load in calls file from TranslationCalls, and original list of orfs from GetCandidateORFs
 calls<-read.csv(calls_file,sep=" ",stringsAsFactors=F)
 orfs<-read.csv(orfs_file, sep=" ",stringsAsFactors=F)
+nulldist<-read.csv(null_file,sep=" ",stringsAsFactors=F)
 
 FDR  <- as.numeric(getArg(parsedArgs, "FDR", "0.05", FALSE))
 
 library(scales)
 library(parallel)
-if (!requireNamespace("codetools", quietly = TRUE)) {
-	install.packages("codetools")
-}
+
 
 if (!requireNamespace("ggplot2", quietly = TRUE)) {
   install.packages("ggplot2")
@@ -90,28 +90,34 @@ time1 = Sys.time()
 # Define a function to calculate the binom.test for a single index i
 #For scrambled ORFs
 calc_binom_false <- function(i) {
-  temp_call <- calls[i,]
-  scrambled_sum = temp_call$scrambled_sum
-  #scrambled_sum =  temp_call$scrambled0 + temp_call$scrambled1 + temp_call$scrambled2
-  #scrambled_sum =  temp_call$scrambled_reads0 + temp_call$scrambled_reads1 + temp_call$scrambled_reads2
-  if ( scrambled_sum> 0) {
-		return(binom.test(temp_call$scrambled0, scrambled_sum, 1/3, alt = "g")[[3]])
- } else {
-    return(1)
+  temp_call <- nulldist[i,]  # Changed from calls to nulldist
+  p_values <- numeric(100)  # Initialize vector to store p-values
+
+  for (j in 0:99) {  # For each scrambled bin
+    scrambled_bin <- paste0("scrambled", j)  # Column name for scrambled bin
+    scrambled_sum_bin <- paste0("scrambled_sum", j)  # Column name for scrambled sum bin
+    scrambled_sum = temp_call[[scrambled_sum_bin]]
+    if ( scrambled_sum > 0) {
+      p_values[j+1] <- binom.test(temp_call[[scrambled_bin]], scrambled_sum, 1/3, alt = "g")[[3]]
+    } else {
+      p_values[j+1] <- 1
+    }
   }
+
+  return(p_values)
 }
 
 # Export the calls object to the worker R processes
 clusterExport(cl = makeCluster(threads), varlist = c("calls"))
 
 # Use future_lapply to apply the calc_binom_false function to each index in parallel
-results <- future_lapply(1:length(orfs[,1]), function(i) calc_binom_false(i))
+results <- future_lapply(1:length(orfs[,1]), calc_binom_false)
 
 print(Sys.time() - time1)
 time1 = Sys.time()
 
 # Combine the results into a single vector
-scram_bin <- unlist(results)
+scram_bin <- do.call("rbind", results)  # Each row represents an ORF, each column a scrambled bin
 
 print(Sys.time() - time1)
 time1 = Sys.time()
@@ -185,9 +191,14 @@ scrambled_hits_canonical<-array()
 # Define a function to calculate the hits and scrambled hits at a given pval threshold
 calc_hits <- function(i, ribo_bin, scram_bin, index) {
   num_hits <- length(which(ribo_bin[index] < i/10000))
-  scrambled_hits <- length(which(scram_bin[index] < i/10000))
+  scrambled_hits <- 0
+  for(j in 1:100) {
+    scrambled_hits <- scrambled_hits + length(which(scram_bin[index, j] < i/10000))
+  }
+  scrambled_hits <- scrambled_hits / 100
   return(list(num_hits = num_hits, scrambled_hits = scrambled_hits))
 }
+
 
 # Use future_lapply to apply the calc_hits function to each pval threshold in parallel
 results <- future_lapply(1:2000, function(i) {
