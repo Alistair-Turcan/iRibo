@@ -183,11 +183,11 @@ public:
 	//vector<int> read_priority_reads;
 	//vector<int> read_priority_reads_fake;
 	int first_max=0;
-	int first_max_scrambled=0;
+	vector<int> first_max_scrambled;
 	int total_frames=0;
-	int total_frames_scrambled=0;
+	vector<int> total_frames_scrambled;
 	vector<int> frame_reads;
-	vector<int> frame_reads_scrambled;
+	//vector<int> frame_reads_scrambled;
 
 	vector<Exon> exons;
 	//int num_agree = 0;
@@ -230,7 +230,8 @@ public:
 		//max_codon = vector<int>(3);
 		//max_codon_scrambled = vector<int>(3);
 		frame_reads = vector<int>(3);
-		frame_reads_scrambled = vector<int>(3);
+		total_frames_scrambled = vector<int>(100);
+		first_max_scrambled = vector<int>(100);
 
 		//seq = vector<vector<int>>(SPECIES_COUNT);
 		//exon_seqs = vector<vector<vector<int>>>(2);
@@ -2081,8 +2082,8 @@ int find_p_site(vector<GeneModel> &orfs, vector<map<int, int>> &reads_map, int p
 
 	for (int i = 0; i < nearby.size(); i++)
 	{
-		//if (i % 3 == best_frame && nearby[i] > total_reads*.05)
-		if (i%3 == best_frame && nearby[i] > max_pos_reads * .35)		
+		if (i % 3 == best_frame && nearby[i] > total_reads*.05)
+		//if (i%3 == best_frame && nearby[i] > max_pos_reads * .35)		
 		{
 			predicted_p_site = i - displacement;
 			break;
@@ -2152,8 +2153,8 @@ int find_p_site_rc(vector<GeneModel> &orfs, vector<map<int, int>> &reads_map, in
 
 	for (int i = nearby.size()-1; i >= 0; i--)
 	{
-		//if (i % 3 == best_frame && nearby[i] > total_reads*.05)
-		if (i%3 == best_frame && nearby[i] > max_pos_reads * .35)
+		if (i % 3 == best_frame && nearby[i] > total_reads*.05)
+		//if (i%3 == best_frame && nearby[i] > max_pos_reads * .35)
 		{
 			predicted_p_site = i - displacement;
 			break;
@@ -2426,10 +2427,13 @@ void assign_reads_to_orfs(vector<GeneModel> &all_orfs, vector<map<int, int>> &re
 
 			if(first>second && first>third){
 				my_orf.first_max++;
-			}
-			if(first+second+third!=0){
+				my_orf.total_frames++;
+			} else if (second>first && second>third){
+				my_orf.total_frames++;
+			} else if (third>first && third>second){
 				my_orf.total_frames++;
 			}
+
 			//}
 			my_orf.frame_reads[0]+=first;
 			my_orf.frame_reads[1]+=second;
@@ -2437,29 +2441,42 @@ void assign_reads_to_orfs(vector<GeneModel> &all_orfs, vector<map<int, int>> &re
 		}
 		
 		
-		//Find scrambled data
-		shuffle(exon_pos_reads.begin(), exon_pos_reads.end(), engine);
-		//Count triplet pattern
-		for(int j=0; j<exon_pos_reads.size()-2; j+=3){
-			//int index = findMaxIndex(exon_pos_reads[j], exon_pos_reads[j+1], exon_pos_reads[j+2]);
-			int first = exon_pos_reads[j];
-			int second = exon_pos_reads[j+1];
-			int third = exon_pos_reads[j+2];
+		for(int k=0; k<100; k++){
+			//Find scrambled data
+			shuffle(exon_pos_reads.begin(), exon_pos_reads.end(), engine);
+			//Count triplet pattern
+			for(int j=0; j<exon_pos_reads.size()-2; j+=3){
+				//int index = findMaxIndex(exon_pos_reads[j], exon_pos_reads[j+1], exon_pos_reads[j+2]);
+				int first = exon_pos_reads[j];
+				int second = exon_pos_reads[j+1];
+				int third = exon_pos_reads[j+2];
 
-			//if(index!=3){ //indicates there was a max index
-				//my_orf.max_codon[findMaxIndex(exon_pos_reads[j], exon_pos_reads[j+1], exon_pos_reads[j+2])]+=1; //Find max codon position
-			if(first>second && first>third){
-				my_orf.first_max_scrambled++;
-			}
-			if(first+second+third!=0){
+				//if(index!=3){ //indicates there was a max index
+					//my_orf.max_codon[findMaxIndex(exon_pos_reads[j], exon_pos_reads[j+1], exon_pos_reads[j+2])]+=1; //Find max codon position
+				/*
+				if(first>second && first>third){
+					my_orf.first_max_scrambled[k]++;
+				}
+				if(first+second+third!=0){
 
-				my_orf.total_frames_scrambled++;
+					my_orf.total_frames_scrambled[k]++;
+					
+				}
+				*/
 				
+			if(first>second && first>third){
+				my_orf.first_max_scrambled[k]++;
+				my_orf.total_frames_scrambled[k]++;
+			} else if (second>first && second>third){
+				my_orf.total_frames_scrambled[k]++;
+			} else if (third>first && third>second){
+				my_orf.total_frames_scrambled[k]++;
 			}
-			//}
-			my_orf.frame_reads_scrambled[0]+=first;
-			my_orf.frame_reads_scrambled[1]+=second;
-			my_orf.frame_reads_scrambled[2]+=third;
+				//}
+				//my_orf.frame_reads_scrambled[k][0]+=first;
+				//my_orf.frame_reads_scrambled[k][1]+=second;
+				//my_orf.frame_reads_scrambled[k][2]+=third;
+			}
 		}
 		/*
 		for(int j=0; j<exon_pos_reads.size()-2; j+=3){
@@ -2606,19 +2623,38 @@ void outputTracks(vector<map<int,int>>& passed_reads_f, vector<map<int,int>>& pa
         buffer_file = ""; //clear the buffer
     }   
 }
+
+//Print all the scrambles
+void print_null_distribution(vector<GeneModel>& orfs, string filename){
+	ofstream file(filename);
+	file << "index";
+	for(int i=0; i<100; i++){
+		file << " scrambled" << i << " scrambled_sum" << i;
+	}
+	for(int i=0; i<orfs.size(); i++){
+		GeneModel& my_orf = orfs[i];
+
+		file << "\n" << i;
+		
+		for(int k=0; k<100; k++){
+			file << " " << my_orf.first_max_scrambled[k] << " " << my_orf.total_frames_scrambled[k];
+		}
+
+
+	}
+}
 void print_translation_calls(vector<GeneModel>& orfs, string filename){
 	ofstream file(filename);
-	file << "index frame0 frame_sum scrambled0 scrambled_sum reads0 reads1 reads2 scrambled_reads0 scrambled_reads1 scrambled_reads2";
+	file << "index frame0 frame_sum reads0 reads1 reads2";
 	for(int i=0; i<orfs.size(); i++){
 		GeneModel& my_orf = orfs[i];
 
 		vector<int>& reads = my_orf.frame_reads;
-		vector<int>& reads_scrambled = my_orf.frame_reads_scrambled;
 
 
 		//Only print orfs with at least one read
 		//if(reads[0]>0 || reads[1]>0 || reads[2]>0){
-			file << "\n" << i << " " << my_orf.first_max << " " << my_orf.total_frames  << " " << my_orf.first_max_scrambled << " " << my_orf.total_frames_scrambled << " " << reads[0] << " " << reads[1] << " " << reads[2] << " " << reads_scrambled[0] << " " << reads_scrambled[1] << " " << reads_scrambled[2];// << " " << my_orf.p_value << " " << my_orf.p_value_scrambled;
+			file << "\n" << i << " " << my_orf.first_max << " " << my_orf.total_frames  << " " << reads[0] << " " << reads[1] << " " << reads[2];// << " " << my_orf.p_value << " " << my_orf.p_value_scrambled;
 		//}
 	}
 	
@@ -3050,6 +3086,8 @@ if(runMode=="GetCandidateORFs")
 		//Print translation statistics, and tracks
 		log_file << "\nPrinting translation_calls.";
 		print_translation_calls(all_orfs,  output_dir + "translation_calls");
+		print_null_distribution(all_orfs,  output_dir + "null_distribution");
+
 		log_file << "\nPrinting tracks.";
 		outputTracks(all_passed_reads_f, all_passed_reads_r, all_orfs, chr_labels, output_dir);
 
