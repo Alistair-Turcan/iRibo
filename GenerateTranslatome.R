@@ -86,6 +86,8 @@ plan(multicore, workers = threads) #Enables multithreading
 print(Sys.time() - time1)
 time1 = Sys.time()
 
+options(future.globals.maxSize = 10000 * 1024^2) # 600 MiB
+
 
 # Define a function to calculate the binom.test for a single index i
 #For scrambled ORFs
@@ -148,6 +150,12 @@ results <- future_lapply(1:length(orfs[,1]), function(i) calc_binom_true(i))
 ribo_bin <- unlist(results)
 print(Sys.time() - time1)
 time1 = Sys.time()
+
+#Check for error
+if(min(ribo_bin)==1){
+	print("No reads detected. Make sure any read lengths passed quality control. Exiting iRibo.")
+	quit(save = "no")
+}
 
 #Identify indicies of canonical and noncanonical ORFs
 #overlaps<-read.csv("orf_overlap",sep=" ") #a file giving info on what annotation each ORF overlaps
