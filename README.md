@@ -27,7 +27,9 @@ The first step of iRibo is to create candidate ORFs to assess translation in. Th
 
 Additional options include:
 --Transcriptome=path/to/transcriptome.gtf. Creates candidate ORFs from the transcriptome instead of the genome.
+
 --Output=path/to/output_folder. Specifies output directory.
+
 --Threads=1. Specifies number of threads to use.
 
 
