@@ -20,7 +20,7 @@ Ribo-seq samples in fastq format should have low quality reads and adaptors trim
 
 Make sure the genome, annotations, and transcriptome all have identical chromosome identifiers. Ie, >chr1 in the genome, and chr1 in the annotations.
 
-GetCandidateORFs
+## GetCandidateORFs
 
 The first step of iRibo is to create candidate ORFs to assess translation in. This step will create a file, candidate_orfs, containing all the potential ORFs that iRibo will look for translation patterns in.
 
@@ -32,7 +32,7 @@ Additional options include:
 
 
 
-GenerateTranslationProfile
+## GenerateTranslationProfile
 
 The next step is to create a genome-wide profile of translation using the aligned ribo-seq reads. This step will create a number of files:
 translation_calls contains statistics about the reads in each orf
@@ -62,7 +62,7 @@ Additional options for this step include:
 --QC_Periodicity=2.0. The scale of periodicity in canonical genes required in a read length in order to pass quality control.
 --QC_Positions=false. Whether to use positions or read counts in quality control. Positions is better for sparser data, read counts is better for more dense data.
 
-GenerateTranslatome
+## GenerateTranslatome
 
 The last step is to generate the translatome. This produces two files. translated_orfs.csv, containing information about all the ORFs iRibo detects as translated, and nORF_discovery.png, showing a graph of the p-values of the actual and scrambled ORFs, as well as the FDR cutoff.
 
