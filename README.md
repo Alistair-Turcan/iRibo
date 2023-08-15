@@ -1,10 +1,12 @@
-# iRibo
+------------------------------------------------------------------------------
+
+iRibo
 
 A comprehensive tool for ... (brief description of what iRibo does).
 
 ------------------------------------------------------------------------------
 
-## Table of Contents:
+Table of Contents:
 1. Installation and Prerequisites
 2. Data Collection and Preprocessing
 3. GetCandidateORFs
@@ -13,82 +15,100 @@ A comprehensive tool for ... (brief description of what iRibo does).
 
 ------------------------------------------------------------------------------
 
-## Installation and Prerequisites:
+Installation and Prerequisites:
 
-- iRibo Download: You can obtain iRibo from here: https://github.com/Alistair-Turcan/iRibo. 
-  Follow these steps after downloading:
+- iRibo Download: 
+  Obtain iRibo from https://github.com/Alistair-Turcan/iRibo. 
+  Instructions post download:
   1. Download the zip file.
   2. cd into the directory.
   3. Run make.
-  4. Note: It is compiled using the g++ compiler and c++17.
+  Note: Compiled using g++ compiler and c++17.
 
 - System Requirements:
   - Memory: At least 64GB
   - Storage: At least 100GB
 
-- Dependencies: Ensure you have R version 4.2.2 installed. 
-  You can download and access the documentation here: https://www.r-project.org/.
+- Dependencies: 
+  R version 4.2.2 is necessary. Download and documentation are available at https://www.r-project.org/.
 
 ------------------------------------------------------------------------------
 
-## Data Collection and Preprocessing:
+Data Collection and Preprocessing:
 
-iRibo requires the following inputs:
-1. Genome: In FASTA format.
-2. Annotations: Accepts GFF3 or GTF formats.
-3. Transcriptome (optional): Contains both annotated and unannotated transcripts.
-4. Aligned ribo-seq reads: Either in SAM or BAM format.
+iRibo takes in:
+1. Genome in FASTA format.
+2. Annotations in GFF3 or GTF format.
+3. Transcriptome (optional): Contains both annotated and unannotated transcripts in GFF3 or GTF format.
+4. Aligned ribo-seq reads in SAM or BAM format.
 
 Recommendation: 
-- Ribo-seq samples in fastq format should have low-quality reads and adaptors trimmed for optimal alignment.
-- Ensure the genome, annotations, and transcriptome have matching chromosome identifiers, e.g., >chr1 in the genome matches chr1 in the annotations.
+- Trim low-quality reads and adaptors from ribo-seq samples in fastq format for best alignment.
+
+Note:
+- Ensure genome, annotations, and transcriptome have consistent chromosome identifiers, e.g., >chr1 in genome should match chr1 in annotations.
 
 ------------------------------------------------------------------------------
 
-## GetCandidateORFs:
+GetCandidateORFs:
 
-Start with creating candidate ORFs for assessing translation. The result is a file named candidate_orfs containing potential ORFs for iRibo's evaluation.
+Begin by generating candidate ORFs for translation assessment. This results in a file "candidate_orfs" with potential ORFs.
+
+./iRibo --RunMode=GetCandidateORFs --Genome=path/to/genome.fa --Annotations=path/to/annotations.gtf
 
 Options:
-- --Transcriptome=path/to/transcriptome.gtf: Use transcriptome instead of the genome for creating ORFs.
-- --Output=path/to/output_folder: Designate the output directory.
-- --Threads=1: Define the number of threads.
+- --Transcriptome=path/to/transcriptome.gtf: Use transcriptome over genome.
+- --Output=path/to/output_folder: Specify output directory.
+- --Threads=1: Set number of threads.
 
 ------------------------------------------------------------------------------
 
-## GenerateTranslationProfile:
+GenerateTranslationProfile:
 
-Generate a genome-wide profile of translation with aligned ribo-seq reads. This stage produces several files:
-- translation_calls: Statistics on reads per ORF.
-- null_distribution: Null distribution stats of reads per ORF.
-... (list the rest of the files in the same manner)
+Generate a genome-wide translation profile using aligned ribo-seq reads. This phase outputs:
+- translation_calls: Read statistics per ORF.
+- null_distribution: Null distribution read statistics per ORF.
+- all_passed_reads_f: Quality-passed forward strand reads.
+- all_passed_reads_r: Quality-passed reverse strand reads (similar to forward).
+- candidate_orfs.gff3: Annotations of all ORFs.
+- all_passed_reads_f.wig: Tracks of forward strand reads.
+- all_passed_reads_r.wig: Tracks of reverse strand reads.
 
-SAMs Construction:
-Construct sams.txt that holds a list of paths to all SAM/BAM files, separated by line:
+To run:
+./iRibo --RunMode=GenerateTranslationProfile --Genome=path/to/genome.fa --Riboseq=path/to/sams.txt --CandidateORFs=path/to/candidate_orfs
+
+SAMs File:
+sams.txt should list paths to all SAM/BAM files, separated by lines:
+e.g., 
 sam_dir/SRR1042853_aligned.out.bam
 sam_dir/SRR1042855_aligned.out.bam
-...
-
-Options:
-- --Output=path/to/output_folder: Set output directory.
-- --Threads=1: Number of threads.
-... (list the rest of the options in the same manner)
-
-------------------------------------------------------------------------------
-
-## GenerateTranslatome:
-
-This final step produces the translatome, resulting in two files:
-- translated_orfs.csv: Data on detected ORFs as translated.
-- nORF_discovery.png: Graphical representation of p-values for actual and scrambled ORFs, alongside the FDR cutoff.
 
 Options:
 - --Output=path/to/output_folder: Define output directory.
-- --Threads=1: Determine the number of threads.
-... (list the rest of the options in the same manner)
+- --Threads=1: Set thread count.
+- --Min_Length=25: Minimum read length for quality control.
+- --Max_Length=35: Maximum read length for quality control.
+- --P_Site_Distance=20: Max distance to check for a p-site.
+- --QC_Count=10000: Number of reads in the first frame for quality control.
+- --QC_Periodicity=2.0: Periodicity scale in canonical genes for quality control.
+- --QC_Positions=false: Use positions or read counts in quality control.
 
 ------------------------------------------------------------------------------
 
-You can add a Contribution, License, or any other general section as required.
+GenerateTranslatome:
+
+This final step creates the translatome, yielding:
+- translated_orfs.csv: Data on translated ORFs.
+- nORF_discovery.png: Graph for p-values of real vs. scrambled ORFs and FDR cutoff.
+
+To run:
+Rscript GenerateTranslatome.R --TranslationCalls=path/to/translation_calls --NullDistribution=path/to/null_distribution --CandidateORFs=path/to/candidate_orfs
+
+Options:
+- --Output=path/to/output_folder: Designate output directory.
+- --Threads=1: Specify thread count.
+- --ExcludeChr=chr1,chr8: Chromosomes/contigs to exclude.
+- --ExcludeOverlapGene=True: Exclude nORFs overlapping canonical genes on the same strand.
+- --FDR=0.05: Define desired false discovery rate.
 
 ------------------------------------------------------------------------------
