@@ -1,12 +1,12 @@
 ------------------------------------------------------------------------------
 
-iRibo
+# iRibo
 
 A comprehensive tool for integrating ribosome profiling data to detect genome wide translation.
 
 ------------------------------------------------------------------------------
 
-Table of Contents:
+## Table of Contents:
 1. Installation and Prerequisites
 2. Data Collection and Preprocessing
 3. GetCandidateORFs
@@ -15,7 +15,7 @@ Table of Contents:
 
 ------------------------------------------------------------------------------
 
-Installation and Prerequisites:
+## Installation and Prerequisites:
 
 - iRibo Download: 
   Obtain iRibo from https://github.com/Alistair-Turcan/iRibo. 
@@ -34,7 +34,7 @@ Installation and Prerequisites:
 
 ------------------------------------------------------------------------------
 
-Data Collection and Preprocessing:
+## Data Collection and Preprocessing:
 
 iRibo takes in:
 1. Genome in FASTA format.
@@ -50,7 +50,7 @@ Note:
 
 ------------------------------------------------------------------------------
 
-GetCandidateORFs:
+## GetCandidateORFs:
 
 Begin by generating candidate ORFs for translation assessment. This results in a file "candidate_orfs" with potential ORFs.
 
@@ -63,7 +63,7 @@ Options:
 
 ------------------------------------------------------------------------------
 
-GenerateTranslationProfile:
+## GenerateTranslationProfile:
 
 Generate a genome-wide translation profile using aligned ribo-seq reads. This phase outputs:
 - translation_calls: Read statistics per ORF.
