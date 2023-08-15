@@ -2,7 +2,7 @@
 
 iRibo
 
-A comprehensive tool for ... (brief description of what iRibo does).
+A comprehensive tool for integrating ribosome profiling data to detect genome wide translation.
 
 ------------------------------------------------------------------------------
 
@@ -107,7 +107,7 @@ Rscript GenerateTranslatome.R --TranslationCalls=path/to/translation_calls --Nul
 Options:
 - --Output=path/to/output_folder: Designate output directory.
 - --Threads=1: Specify thread count.
-- --ExcludeChr=chr1,chr8: Chromosomes/contigs to exclude.
+- --ExcludeChr=chr1,chr8: Chromosomes/contigs to exclude. Default is none.
 - --ExcludeOverlapGene=True: Exclude nORFs overlapping canonical genes on the same strand.
 - --FDR=0.05: Define desired false discovery rate.
 
