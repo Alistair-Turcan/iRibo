@@ -95,7 +95,7 @@ Options:
 
 ------------------------------------------------------------------------------
 
-GenerateTranslatome:
+## GenerateTranslatome:
 
 This final step creates the translatome, yielding:
 - translated_orfs.csv: Data on translated ORFs.
