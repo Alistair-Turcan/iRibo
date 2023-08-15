@@ -1,6 +1,6 @@
 # iRibo
 
-Installation and Prerequisites
+## Installation and Prerequisites
 
 iRibo can be downloaded from https://github.com/Alistair-Turcan/iRibo. Simply download the zip file, cd into the directory, and run make. It is compiled using the g++ compiler and c++17.
 
