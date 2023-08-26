@@ -207,7 +207,7 @@ public:
 	//string dorf_id = "X";
 	//string CDS_intersect = "X";
 	//string CDS_biotype = "X";
-	//int orf_length = 0;
+	int orf_length = 0;
 	//int age_class = -1;
 	//string orf_annotation_type;
 	//string orf_gene_biotype;
@@ -634,10 +634,25 @@ void read_gff3(vector<GTF>& gtfs, string filename, map<string, int>& chr_labels)
 }
 void read_gtf_original(vector<GTF> &gtfs, string filename, map<string,int> &chr_labels, bool includes_chr_prefix)
 {
+	int index=0;
 	ifstream file(filename);
 	string line;
 	while (getline(file, line))
 	{
+		/*
+			index++;
+			if(index==9){
+				exit(0);
+			}
+			
+		vector<string> columns;
+		split(line, '\t', columns);
+		for(string s: columns){
+			cout << s << " ";
+		}
+		cout << "\n";
+		//continue;
+		*/
 		if (line[0] != '#')
 		{
 			vector<string> columns;
@@ -656,6 +671,7 @@ void read_gtf_original(vector<GTF> &gtfs, string filename, map<string,int> &chr_
 			
 			gtfs.back().source = columns[1];
 			gtfs.back().annotation_type = columns[2];
+
 			gtfs.back().start = stoi(columns[3])-1;
 
 			gtfs.back().end = stoi(columns[4])-1;
@@ -690,7 +706,8 @@ void read_gtf_original(vector<GTF> &gtfs, string filename, map<string,int> &chr_
 				}
 				if (info[i] == "exon_number")
 				{
-					gtfs.back().exon_number = stoi(info[i + 1].substr(1, info[i + 1].size() - 3));
+					//cout << "Attempting to convert: " << info[i + 1].substr(0, info[i + 1].size() - 3) << endl;
+					//gtfs.back().exon_number = stoi(info[i + 1].substr(0, info[i + 1].size() - 3));
 				}
 				if(info[i] == "ccds_id")
 				{
@@ -1169,19 +1186,19 @@ void filter_overlapping_orfs(vector<CandidateORF> &orfs, int threads){
         CandidateORF &orf = orfs[i];
         if (orf.strand == 1)
         {
-            if (!stop_locs.count(orf.chr) || !stop_locs.at(orf.chr).count(orf.stop_codon_pos) || orf.stop_codon_pos - orf.start_codon_pos > stop_locs.at(orf.chr).at(orf.stop_codon_pos))
+            if (!stop_locs.count(orf.chr) || !stop_locs.at(orf.chr).count(orf.stop_codon_pos) || orf.orf_length > stop_locs.at(orf.chr).at(orf.stop_codon_pos))
             {
 
-                stop_locs[orf.chr][orf.stop_codon_pos] = orf.stop_codon_pos - orf.start_codon_pos;
+                stop_locs[orf.chr][orf.stop_codon_pos] = orf.orf_length;
 			   
             }
         }
         else
         {
-            if (!stop_locs.count(orf.chr) || !stop_locs.at(orf.chr).count(orf.start_codon_pos) || orf.stop_codon_pos - orf.start_codon_pos > stop_locs.at(orf.chr).at(orf.start_codon_pos))
+            if (!stop_locs.count(orf.chr) || !stop_locs.at(orf.chr).count(orf.start_codon_pos) || orf.orf_length > stop_locs.at(orf.chr).at(orf.start_codon_pos))
             {
 				
-					stop_locs[orf.chr][orf.start_codon_pos] = orf.stop_codon_pos - orf.start_codon_pos;
+					stop_locs[orf.chr][orf.start_codon_pos] = orf.orf_length;
 				
             }
         }
@@ -1193,9 +1210,9 @@ void filter_overlapping_orfs(vector<CandidateORF> &orfs, int threads){
         CandidateORF &orf = orfs[i];
         string orf_id = to_string(orf.chr) + "_" + to_string(orf.start_codon_pos) + "_" + to_string(orf.stop_codon_pos);
         bool toAdd = false;
-        if (orf.strand == 0 && stop_locs[orf.chr][orf.start_codon_pos] == orf.stop_codon_pos - orf.start_codon_pos)
+        if (orf.strand == 0 && stop_locs[orf.chr][orf.start_codon_pos] == orf.orf_length)
             toAdd = true;
-        else if (orf.strand == 1 && stop_locs[orf.chr][orf.stop_codon_pos] == orf.stop_codon_pos - orf.start_codon_pos)
+        else if (orf.strand == 1 && stop_locs[orf.chr][orf.stop_codon_pos] == orf.orf_length)
             toAdd = true;
 
         if (toAdd)
@@ -1224,19 +1241,19 @@ void filter_duplicate_orfs(vector<CandidateORF> &orfs, int threads)
         CandidateORF &orf = orfs[i];
         if (orf.strand == 0)
         {
-            if (!stop_locs.count(orf.chr) || !stop_locs.at(orf.chr).count(orf.stop_codon_pos) || orf.stop_codon_pos - orf.start_codon_pos > stop_locs.at(orf.chr).at(orf.stop_codon_pos))
+            if (!stop_locs.count(orf.chr) || !stop_locs.at(orf.chr).count(orf.stop_codon_pos) || orf.orf_length > stop_locs.at(orf.chr).at(orf.stop_codon_pos))
             {
 
-                stop_locs[orf.chr][orf.stop_codon_pos] = orf.stop_codon_pos - orf.start_codon_pos;
+                stop_locs[orf.chr][orf.stop_codon_pos] = orf.orf_length;
 			   
             }
         }
         else
         {
-            if (!stop_locs.count(orf.chr) || !stop_locs.at(orf.chr).count(orf.start_codon_pos) || orf.stop_codon_pos - orf.start_codon_pos > stop_locs.at(orf.chr).at(orf.start_codon_pos))
+            if (!stop_locs.count(orf.chr) || !stop_locs.at(orf.chr).count(orf.start_codon_pos) || orf.orf_length> stop_locs.at(orf.chr).at(orf.start_codon_pos))
             {
 				
-					stop_locs[orf.chr][orf.start_codon_pos] = orf.stop_codon_pos - orf.start_codon_pos;
+					stop_locs[orf.chr][orf.start_codon_pos] = orf.orf_length;
 				
             }
         }
@@ -1248,9 +1265,9 @@ void filter_duplicate_orfs(vector<CandidateORF> &orfs, int threads)
         CandidateORF &orf = orfs[i];
         string orf_id = to_string(orf.chr) + "_" + to_string(orf.start_codon_pos) + "_" + to_string(orf.stop_codon_pos);
         bool toAdd = false;
-        if (orf.strand == 0 && stop_locs[orf.chr][orf.stop_codon_pos] == orf.stop_codon_pos - orf.start_codon_pos)
+        if (orf.strand == 0 && stop_locs[orf.chr][orf.stop_codon_pos] == orf.orf_length)
             toAdd = true;
-        else if (orf.strand == 1 && stop_locs[orf.chr][orf.start_codon_pos] == orf.stop_codon_pos - orf.start_codon_pos)
+        else if (orf.strand == 1 && stop_locs[orf.chr][orf.start_codon_pos] == orf.orf_length)
             toAdd = true;
 
         if (toAdd)
@@ -1514,7 +1531,9 @@ void find_intersect_ann(vector<CandidateORF> &orfs, vector<GTF> &anns, map<strin
 					}
                     if(my_orf.strand==0)
                     {
-                        if(abs(cds[cds_id].start-my_orf.start_codon_pos)<=3 && abs(cds[cds_id].end-my_orf.stop_codon_pos)<=3)
+                        //if(abs(cds[cds_id].start-my_orf.start_codon_pos)<=3 && abs(cds[cds_id].end-my_orf.stop_codon_pos)<=3)
+						if(cds.at(cds_id).start==orfs[i].start_codon_pos && cds.at(cds_id).end+3==orfs[i].stop_codon_pos)
+
                         {   
 							canonical_count++;
                             my_orf.gene_id = my_ann.gene_id;
@@ -1528,8 +1547,9 @@ void find_intersect_ann(vector<CandidateORF> &orfs, vector<GTF> &anns, map<strin
                     }
                     if(my_orf.strand==1)
                     {
-                        if(abs(cds[cds_id].start-my_orf.start_codon_pos)<=3 && abs(cds[cds_id].end-my_orf.stop_codon_pos)<=3)
-                        {   
+                        //if(abs(cds[cds_id].start-my_orf.start_codon_pos)<=3 && abs(cds[cds_id].end-my_orf.stop_codon_pos)<=3)
+						if(cds.at(cds_id).start-3==orfs[i].start_codon_pos && cds.at(cds_id).end==orfs[i].stop_codon_pos)
+						{   
 							canonical_count++;
 
                             my_orf.gene_id = my_ann.gene_id;
@@ -1738,6 +1758,8 @@ void read_genes(vector<GeneModel> & gene_models,string filename, bool annotated_
 		my_gene_model.strand = stoi(column_data[5]);
 		my_gene_model.start_codon_pos = stoi(column_data[6]);
 		my_gene_model.stop_codon_pos = stoi(column_data[7]);
+		my_gene_model.orf_length = stoi(column_data[19]);
+
 		vector<string> exon_starts;
 		split(column_data[8], ',', exon_starts);
 		vector<string> exon_stops;
@@ -2341,7 +2363,80 @@ void get_orf_chr_str(vector<CandidateORF> &orfs, map<string,int> &chr_labels, in
 
 
 
+void expand_gene_models_old(vector<GeneModel> &gene_models)
+{
+	for (int i = 0; i < gene_models.size(); i++)
+	{
+		if (gene_models[i].strand == 0)
+		{
+			if (gene_models[i].exons.size() > 0 && gene_models[i].stop_codon_pos != -1)
+			{
 
+				gene_models[i].frame = vector<int>(1 + gene_models[i].stop_codon_pos - gene_models[i].start_codon_pos, 4);
+				int cur_frame = 0;
+				for (int j = 0; j < gene_models[i].exons.size(); j++)
+				{
+					if (gene_models[i].exons[j].end > gene_models[i].start_codon_pos && gene_models[i].exons[j].start < gene_models[i].stop_codon_pos)
+					{
+						gene_models[i].exons[j].is_coding = true;
+						if (gene_models[i].exons[j].start < gene_models[i].start_codon_pos)
+						{
+							gene_models[i].exons[j].start = gene_models[i].start_codon_pos;
+						}
+						if (gene_models[i].exons[j].end > gene_models[i].stop_codon_pos)
+						{
+							gene_models[i].exons[j].end = gene_models[i].stop_codon_pos;
+						}
+						for (int k = 0; k <= gene_models[i].exons[j].end - gene_models[i].exons[j].start; k++)
+						{
+
+							gene_models[i].frame[gene_models[i].exons[j].start - gene_models[i].start_codon_pos + k] = cur_frame;
+							cur_frame++;
+							if (cur_frame == 3)
+							{
+								cur_frame = 0;
+							}
+						}
+					}
+				}
+			}
+		}
+		if (gene_models[i].strand == 1)
+		{
+			if (gene_models[i].exons.size() > 0 && gene_models[i].stop_codon_pos != -1)
+			{
+
+				gene_models[i].frame = vector<int>(1 + gene_models[i].stop_codon_pos - gene_models[i].start_codon_pos, 4);
+				int cur_frame = 0;
+				for (int j = gene_models[i].exons.size()-1; j >=0 /*gene_models[i].exons.size()*/; j--)
+				{
+					if (gene_models[i].exons[j].end > gene_models[i].start_codon_pos && gene_models[i].exons[j].start < gene_models[i].stop_codon_pos)
+					{
+						gene_models[i].exons[j].is_coding = true;
+						if (gene_models[i].exons[j].start < gene_models[i].start_codon_pos)
+						{
+							gene_models[i].exons[j].start = gene_models[i].start_codon_pos;
+						}
+						if (gene_models[i].exons[j].end > gene_models[i].stop_codon_pos)
+						{
+							gene_models[i].exons[j].end = gene_models[i].stop_codon_pos;
+						}
+						for (int k = 0; k <= gene_models[i].exons[j].end - gene_models[i].exons[j].start; k++)
+						{
+
+							gene_models[i].frame[gene_models[i].stop_codon_pos-gene_models[i].exons[j].end +  k] = cur_frame;
+							cur_frame++;
+							if (cur_frame == 3)
+							{
+								cur_frame = 0;
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+}
 bool quality_control(vector<GeneModel> &orfs, vector<map<int, int>> &reads_map_f, vector<map<int, int>> &reads_map_r, int p_site_f, int p_site_r, int threads, bool qc_positions, vector<int>& ann_frames) {
 
     #pragma omp parallel for num_threads(threads)
@@ -2457,11 +2552,11 @@ void assign_reads_to_orfs(vector<GeneModel> &all_orfs, vector<map<int, int>> &re
         GeneModel &my_orf = all_orfs[i];
 
 
-		vector<int> exon_pos_reads (my_orf.stop_codon_pos - my_orf.start_codon_pos + 1);
+		vector<int> exon_pos_reads (my_orf.orf_length);
 		//my_orf.pos_read_count = vector<int>(my_orf.stop_codon_pos - my_orf.start_codon_pos + 1);
 
 
-
+		int pos_index=0; //stores position of orf
 		if (my_orf.strand == 0) {
 			
 			map<int,int> &my_map = reads_map_f[my_orf.chr];
@@ -2471,12 +2566,14 @@ void assign_reads_to_orfs(vector<GeneModel> &all_orfs, vector<map<int, int>> &re
 				if(my_orf.frame[j-my_orf.start_codon_pos] > 2){
 					continue;
 				}
+				
 
 
 				if (my_map.find(j)!= my_map_end) {
-					exon_pos_reads[j-my_orf.start_codon_pos] = (my_map[j]);
+					exon_pos_reads[pos_index] = (my_map[j]);
 					//my_orf.pos_read_count[j-my_orf.start_codon_pos]=my_map[j];
 				}
+				pos_index++;
 
 			}
 		} else if(my_orf.strand==1) {
@@ -2488,12 +2585,12 @@ void assign_reads_to_orfs(vector<GeneModel> &all_orfs, vector<map<int, int>> &re
 					continue;
 				}
 
-
 				if (my_map.find(j)!= my_map_end) {
-					exon_pos_reads[my_orf.stop_codon_pos-j] = my_map[j];
+					exon_pos_reads[pos_index] = my_map[j];
 					//my_orf.pos_read_count[my_orf.stop_codon_pos-j]=my_map[j];
 
 				}
+				pos_index++;
 
 			}
 		}
@@ -2829,6 +2926,7 @@ if(runMode=="GetCandidateORFs")
     start = std::chrono::high_resolution_clock::now();
 	cout << "\n" << canonical_gene_annotation_path;
 	
+
 	if(gff){
 		read_gff3(annotations2, canonical_gene_annotation_path, chr_labels);
 	} else {
@@ -3065,7 +3163,7 @@ if(runMode=="GetCandidateORFs")
 		
 
 		//Initialize the frame indexes of each candidate orf
-		expand_gene_models(canonical_orfs, threads);
+		expand_gene_models_old(canonical_orfs);
 
 		//Stores all the total reads
 		vector<map<int,int>> all_passed_reads_f(chr_labels.size());
@@ -3176,7 +3274,7 @@ if(runMode=="GetCandidateORFs")
 		//Read in all ORFs
 		vector<GeneModel> all_orfs;
 		read_genes(all_orfs, candidate_orfs_path, false);
-		expand_gene_models(all_orfs, threads);
+		expand_gene_models_old(all_orfs);
 		
 		assign_reads_to_orfs(all_orfs, all_passed_reads_f,all_passed_reads_r, threads);
 		//print_gene_reads_new(all_orfs, output_dir + "orfs_reads"); // _"+to_string(align_start)  + "_" + to_string(align_end)  + "_" + to_string(cutoff)  + "_" + to_string(required_frame_difference));
