@@ -14,7 +14,10 @@
 #include <omp.h>
 #include <array>
 #include <filesystem>
+#include <cctype>
 #include <dirent.h>
+#include <unordered_set>
+#include <utility>  // for std::pair
 
 using namespace std;
 using namespace std::chrono;
@@ -29,6 +32,19 @@ namespace fs = std::filesystem;
 //3. remap to p-site based on canonical genes
 //4. map reads to ORFs
 //5. assess candidate translation status
+
+struct PairHash {
+public:
+    template <typename T1, typename T2>
+    std::size_t operator () (const std::pair<T1, T2>& p) const {
+        auto h1 = std::hash<T1>{}(p.first);
+        auto h2 = std::hash<T2>{}(p.second);
+
+        // Mainly for demonstration; it's overly simple
+        // Consider Koenig's xor-combining function or similar
+        return h1 ^ h2;
+    }
+};
 
 class GTF
 {
@@ -116,7 +132,7 @@ class CandidateORF
 public:
 	int chr = -1;
 	string chr_str;
-	string transcript_id;
+	string transcript_id="X";
 	string gene_id;
 	string secondary_gene_id;
 	int start_codon_pos=-1;
@@ -145,20 +161,23 @@ public:
 	int age_class = -1;
 	string orf_annotation_type;
 	string orf_gene_biotype;
-
+	bool longest_start=false;
+	bool longest_stop=false;
+	
 	CandidateORF()
 	{
 
 	}
 	bool operator<(const CandidateORF& gene)
 	{
-		
-		if (gene.chr == this->chr)
-		{
-			
-			return this->start_codon_pos < gene.start_codon_pos;
-		}
-		return this->chr < gene.chr;
+		//if(gene.strand==this->strand){
+			if (gene.chr == this->chr)
+			{
+				return this->start_codon_pos < gene.start_codon_pos;
+			}
+			return this->chr < gene.chr;
+		//}
+		//return this->strand<gene.strand;
 	}
 };
 
@@ -926,6 +945,8 @@ void get_transcript_seq_speedy(vector<Transcript> &transcripts, vector<string> &
             Exon& currExon = currTranscript.exons[j];  // Reference to current exon
 
             currExon.seq = genome[currTranscript.chr].substr(currExon.start, currExon.end - currExon.start + 1);
+			std::transform(std::begin(currExon.seq), std::end(currExon.seq), std::begin(currExon.seq), ::toupper);
+
             if (currTranscript.strand == 1) {
                 //reverse(currExon.seq.begin(), currExon.seq.end());
 				reverse_complement(currExon.seq);
@@ -1004,7 +1025,7 @@ void get_orfs_genome(vector<CandidateORF> &orfs, vector<string> &genome, int thr
 							orf.stop_codon_pos = fake_exon.end;	
 						}
 						fake_exon.is_coding=true;
-						orf.seq = chromosome_seq.substr(i, j-i+3);
+						//orf.seq = chromosome_seq.substr(i, j-i+3);
 						orf.exons.emplace_back(fake_exon);
 						orf.strand = strand;
 						orf.chr_str = rev_chr_labels[chr/2];
@@ -1016,10 +1037,10 @@ void get_orfs_genome(vector<CandidateORF> &orfs, vector<string> &genome, int thr
 						
 						//Only longest sequences
 						if(strand == 0 && prev_stops.find(orf.stop_codon_pos)!=prev_stops.end()){
-							break;
+							//break;
 						}
 						else if(strand == 1 && prev_stops.find(orf.start_codon_pos)!=prev_stops.end()){
-							break;
+							//break;
 						}						
 						
                         #pragma omp critical
@@ -1051,6 +1072,7 @@ void get_orfs_speedy(vector<CandidateORF> &orfs, vector<Transcript> &transcripts
 	{
 		rev_chr_labels[it->second]=it->first;
 	}
+	
 	
 	#pragma omp parallel for num_threads(threads) schedule(dynamic)
 	for (int i = 0; i < transcripts.size(); i++)
@@ -1127,6 +1149,10 @@ void get_orfs_speedy(vector<CandidateORF> &orfs, vector<Transcript> &transcripts
 						orf.exons.back().end = genome_index[k + 2];// -1;
 						orf.start_codon_pos = genome_index[j];// -1;
 						orf.stop_codon_pos = genome_index[k + 2];// -1;
+						
+						for(int p=k+2; p>=j; p--){
+							
+						}
 						if (transcript.strand == 1)
 						{
 							orf.exons.front().start = genome_index[k + 2]; 
@@ -1144,14 +1170,14 @@ void get_orfs_speedy(vector<CandidateORF> &orfs, vector<Transcript> &transcripts
 						}
 						orf.orf_length = orf_length;
 						
-						orf.seq = transcript_seq.substr(j, k-j+3);
+						//orf.seq = transcript_seq.substr(j, k-j+3);
 						
 						//Only longest sequences
 						if(orf.strand == 0 && prev_stops.find(orf.stop_codon_pos)!=prev_stops.end()){
-							break;
+							//break;
 						}
 						else if(orf.strand == 1 && prev_stops.find(orf.start_codon_pos)!=prev_stops.end()){
-							break;
+							//break;
 						}
 						
 						#pragma omp critical
@@ -1204,11 +1230,11 @@ void filter_overlapping_orfs(vector<CandidateORF> &orfs, int threads){
         }
     }
 
-    #pragma omp parallel for num_threads(threads) schedule(dynamic)
+    //#pragma omp parallel for num_threads(threads) schedule(dynamic)
     for (int i = 0; i < orfs.size(); i++)
     {
         CandidateORF &orf = orfs[i];
-        string orf_id = to_string(orf.chr) + "_" + to_string(orf.start_codon_pos) + "_" + to_string(orf.stop_codon_pos);
+        string orf_id = to_string(i); //to_string(orf.chr) + "_" + to_string(orf.start_codon_pos) + "_" + to_string(orf.stop_codon_pos);
         bool toAdd = false;
         if (orf.strand == 0 && stop_locs[orf.chr][orf.start_codon_pos] == orf.orf_length)
             toAdd = true;
@@ -1217,17 +1243,18 @@ void filter_overlapping_orfs(vector<CandidateORF> &orfs, int threads){
 
         if (toAdd)
         {
-            #pragma omp critical
+            //#pragma omp critical
             {
                 if (!orf_ids.count(orf_id))
                 {
-                    filtered_orfs.emplace_back(orf);
+                    //filtered_orfs.emplace_back(orf);
+					orf.longest_start=true;
                     orf_ids.insert(orf_id);
                 }
             }
         }
     }
-    orfs = filtered_orfs;
+    //orfs = filtered_orfs;
 }
 void filter_duplicate_orfs(vector<CandidateORF> &orfs, int threads)
 {
@@ -1241,29 +1268,37 @@ void filter_duplicate_orfs(vector<CandidateORF> &orfs, int threads)
         CandidateORF &orf = orfs[i];
         if (orf.strand == 0)
         {
+
             if (!stop_locs.count(orf.chr) || !stop_locs.at(orf.chr).count(orf.stop_codon_pos) || orf.orf_length > stop_locs.at(orf.chr).at(orf.stop_codon_pos))
             {
-
+				
                 stop_locs[orf.chr][orf.stop_codon_pos] = orf.orf_length;
 			   
             }
+			if(orf.gene_id!="X"){
+                stop_locs[orf.chr][orf.stop_codon_pos] = 999999;
+			}
         }
         else
         {
+
             if (!stop_locs.count(orf.chr) || !stop_locs.at(orf.chr).count(orf.start_codon_pos) || orf.orf_length> stop_locs.at(orf.chr).at(orf.start_codon_pos))
             {
 				
 					stop_locs[orf.chr][orf.start_codon_pos] = orf.orf_length;
 				
             }
+			if(orf.gene_id!="X"){
+                stop_locs[orf.chr][orf.start_codon_pos] = 999999;
+			}
         }
     }
 
-    #pragma omp parallel for num_threads(threads) schedule(dynamic)
+    //#pragma omp parallel for num_threads(threads) schedule(dynamic)
     for (int i = 0; i < orfs.size(); i++)
     {
         CandidateORF &orf = orfs[i];
-        string orf_id = to_string(orf.chr) + "_" + to_string(orf.start_codon_pos) + "_" + to_string(orf.stop_codon_pos);
+        string orf_id = to_string(i); //to_string(orf.chr) + "_" + to_string(orf.start_codon_pos) + "_" + to_string(orf.stop_codon_pos);
         bool toAdd = false;
         if (orf.strand == 0 && stop_locs[orf.chr][orf.stop_codon_pos] == orf.orf_length)
             toAdd = true;
@@ -1272,17 +1307,18 @@ void filter_duplicate_orfs(vector<CandidateORF> &orfs, int threads)
 
         if (toAdd)
         {
-            #pragma omp critical
+            //#pragma omp critical
             {
                 if (!orf_ids.count(orf_id))
                 {
-                    filtered_orfs.emplace_back(orf);
+                    //filtered_orfs.emplace_back(orf);
+					orf.longest_stop=true;
                     orf_ids.insert(orf_id);
                 }
             }
         }
     }
-    orfs = filtered_orfs;
+    //orfs = filtered_orfs;
 }
 void get_gene_seq_speedy(vector<CandidateORF> &genes, vector<string> &genome, int threads)
 {
@@ -1329,7 +1365,7 @@ void expand_candidate_orfs(vector<CandidateORF> &gene_models, int threads)
 
 				if (exon.end > gene_model.start_codon_pos && exon.start < gene_model.stop_codon_pos)
 				{
-					exon.is_coding = true;
+					//exon.is_coding = true;
 
 					exon.start = max(exon.start, gene_model.start_codon_pos);
 					exon.end = min(exon.end, gene_model.stop_codon_pos);
@@ -1398,51 +1434,400 @@ void expand_gene_models(vector<GeneModel> &gene_models, int threads)
 }
 
 
-void print_genes(const vector<vector<CandidateORF>> &gene_models,string filename, int strand, int& orf_index)
+void print_genes(vector<CandidateORF> &orfs,string filename, int strand, int& orf_index)
 {
 	map<int, char> rev_nucmap = { { 0,'A' },{ 1,'C' },{ 2 ,'G'},{ 3,'T' },{ 4,'N' },{ 5,'-' },{6,'#'} };
 
     std::ofstream file(filename, std::ios::app); // Open the file in append mode
-	for (int g = 0; g < gene_models.size(); g++)
+
+	for (int i = 0; i < orfs.size(); i++)
 	{
-		for (int i = 0; i < gene_models[g].size(); i++)
-		{
-			if(gene_models[g][i].strand!=strand){
-				continue;
-			}
-			file << "\n" << orf_index << " " << gene_models[g][i].species<<" "<< gene_models[g][i].transcript_id << " " << gene_models[g][i].gene_id << " " << gene_models[g][i].chr << " " << gene_models[g][i].strand << " " << gene_models[g][i].start_codon_pos << " " << gene_models[g][i].stop_codon_pos << " ";
-			for (int j = 0; j < gene_models[g][i].exons.size(); j++)
-			{
-				file << gene_models[g][i].exons[j].start << ",";
-			}
-			file << " ";
-			for (int j = 0; j < gene_models[g][i].exons.size(); j++)
-			{
-				file << gene_models[g][i].exons[j].end << ",";
-			}
-			file << " ";
-			for (int j = 0; j < gene_models[g][i].exons.size(); j++)
-			{
-				file << gene_models[g][i].exons[j].is_coding << ",";
-			}
-			/*for (int j = 0; j < gene_models[g][i].read_count.size(); j++)
-			{
-				file << " " << gene_models[g][i].read_count[j];
-			}*/
-			
-			file << " " << gene_models[g][i].num_agree << " " << gene_models[g][i].pos_agree<<" "<<gene_models[g][i].lncrna<<" "<<gene_models[g][i].processed_pseudogene<<" "<<gene_models[g][i].unprocessed_pseudogene<<" "<<gene_models[g][i].protein_coding<<" "<<gene_models[g][i].biotype_other<<" "<<gene_models[g][i].intersect_gene<<" "<<gene_models[g][i].orf_length<<" "<<gene_models[g][i].age_class<<" "<<gene_models[g][i].secondary_gene_id<<" "<<gene_models[g][i].exons.size()<<" "<<gene_models[g][i].intersect_five_utr<<" "<<gene_models[g][i].intersect_three_utr<<" "<<gene_models[g][i].uorf_id<<" "<<gene_models[g][i].dorf_id<<" "<<gene_models[g][i].antisense_gene<<" "<<gene_models[g][i].CDS_intersect<<" "<<gene_models[g][i].CDS_biotype<<" "<<gene_models[g][i].orf_annotation_type<<" "<<gene_models[g][i].orf_gene_biotype<<" "<<gene_models[g][i].chr_str;
-			
-			file << " ";
-			/*
-			for(Exon exon: gene_models[g][i].exons){
-				file << exon.seq;
-			}*/
-			file << gene_models[g][i].seq;
-			orf_index++;
+		CandidateORF& my_orf = orfs[i];
+		if(my_orf.strand!=strand){ //print by strand
+			continue;
 		}
+		file << "\n" << orf_index <<" "<< my_orf.transcript_id << " " << my_orf.gene_id << " " << my_orf.chr << " " << my_orf.strand << " " << my_orf.start_codon_pos << " " << my_orf.stop_codon_pos << " ";
+		for (int j = 0; j < my_orf.exons.size(); j++)
+		{
+			file << my_orf.exons[j].start << "-" << my_orf.exons[j].end << ",";
+		}
+		
+		file <<" "<<my_orf.orf_length<<" "<<my_orf.antisense_gene<<" "<<my_orf.CDS_intersect<<" "<<my_orf.chr_str;
+		
+		/*
+		for(Exon exon: my_orf.exons){
+			file << exon.seq;
+		}*/
+		//file << my_orf.seq;
+		orf_index++;
 	}
+	
 }
 
+void filter_longest_and_canonical(vector<CandidateORF> &orfs, bool genomeOnly){
+	std::vector<CandidateORF> new_orfs;
+
+	// Populate the new vector with CandidateORF objects that meet the criteria
+	for (const CandidateORF &orf : orfs) {
+		if (((orf.longest_start || genomeOnly) && orf.longest_stop) || orf.gene_id!="X") { //add longest or canonicals
+			new_orfs.emplace_back(orf);
+		}
+	}
+	// Replace the old orfs list with the new list
+	orfs = std::move(new_orfs);
+	new_orfs.clear();
+}
+void filter_splice_frame_overlap(vector<CandidateORF> &orfs, int threads,  map<string, int> &chr_labels){
+    //vector<map<int, vector<pair<int, int>>>> codon_pos_f(chr_labels.size());
+    //vector<map<int, vector<pair<int, int>>>> codon_pos_r(chr_labels.size());
+
+    std::chrono::duration<double> elapsed;
+    auto start = std::chrono::high_resolution_clock::now();
+    auto finish = std::chrono::high_resolution_clock::now();
+	
+	std::set<std::pair<int, int>> overlap_pairs;
+
+    start = std::chrono::high_resolution_clock::now();
+
+	#pragma omp parallel for num_threads(threads) schedule(dynamic)
+	for(int p=0; p<chr_labels.size()*2; p++){
+		int count =0;
+		map<int, vector<pair<int, int>>> codon_pos;
+		int curchr=p/2;
+		int curstrand=p%2;
+		std::set<std::pair<int, int>> overlap_pairs_thread;
+		
+		
+		//Iterate over the orfs once, look accumulate frames at each position
+		for (int i = 0; i <orfs.size(); i++) {
+			CandidateORF& cur_orf = orfs[i];
+			if(cur_orf.chr!=curchr || cur_orf.strand!=curstrand){
+				continue;
+			}
+			bool fin = false;
+			count++;
+			if(count==10000){
+				//break;
+			}
+			int cur_frame = 0;
+
+			if (cur_orf.strand == 0) {
+				for (int j = 0; j < cur_orf.exons.size(); j++) {
+					Exon& cur_exon = cur_orf.exons[j];
+					fin=false;
+					for (int k = cur_exon.start; k <= cur_exon.end; k++) {
+						vector<pair<int, int>>& cur_pos = codon_pos[k];
+						cur_pos.emplace_back(cur_frame, i);
+						
+						cur_frame++;
+						if (cur_frame == 3) {
+							cur_frame = 0;
+						}
+
+					}
+				}
+			} else {
+				for (int j = cur_orf.exons.size()-1; j >=0; j--) {
+					Exon& cur_exon = cur_orf.exons[j];
+					fin=false;
+					for (int k = cur_exon.end; k >= cur_exon.start; k--) {
+						vector<pair<int, int>>& cur_pos = codon_pos[k];
+						cur_pos.emplace_back(cur_frame, i);
+
+
+						cur_frame++;
+						if (cur_frame == 3) {
+							cur_frame = 0;
+						}
+					}
+				}
+
+			}
+		}
+		
+		//Now, iterate over again and check for overlaps
+		for (int i = 0; i <orfs.size(); i++) {
+			CandidateORF& cur_orf = orfs[i];
+			if(cur_orf.chr!=curchr || cur_orf.strand!=curstrand){
+				continue;
+			}
+			bool fin = false;
+			count++;
+			if(count==10000){
+				//break;
+			}
+			int cur_frame = 0;
+
+
+			if (cur_orf.strand == 0) {
+				for (int j = 0; j < cur_orf.exons.size(); j++) {
+					Exon& cur_exon = cur_orf.exons[j];
+					fin=false;
+					for (int k = cur_exon.start; k <= cur_exon.end; k++) {
+						vector<pair<int, int>>& cur_pos = codon_pos[k];
+
+						//Compare current frame at all other positions current frames
+						if(!fin){
+						
+							for (int l = 0; l < cur_pos.size(); l++) {
+								if (i!=cur_pos[l].second && cur_frame == cur_pos[l].first) {
+
+									overlap_pairs_thread.insert({i, cur_pos[l].second });
+									fin = true;
+								}
+							}
+						}
+	
+						cur_frame++;
+						if (cur_frame == 3) {
+							cur_frame = 0;
+						}
+					}
+				}
+			} else {
+				for (int j = cur_orf.exons.size()-1; j >=0; j--) {
+					Exon& cur_exon = cur_orf.exons[j];
+					fin=false;
+					for (int k = cur_exon.end; k >= cur_exon.start; k--) {
+						vector<pair<int, int>>& cur_pos = codon_pos[k];
+						//cur_pos.emplace_back(cur_frame, i);
+
+						//Compare current frame at all other positions current frames
+						if(!fin){
+							for (int l = 0; l < cur_pos.size(); l++) {
+								if (i!=cur_pos[l].second && cur_frame == cur_pos[l].first) {
+
+									overlap_pairs_thread.insert({i, cur_pos[l].second });
+									fin =true;
+								}
+							}
+						}
+
+						cur_frame++;
+						if (cur_frame == 3) {
+							cur_frame = 0;
+						}
+					}
+				}
+			}
+		}
+		
+		#pragma omp critical
+		{
+			// Now, merge the thread-local sets into a global set.
+			for (const auto &thread_set : overlap_pairs_thread) {
+				overlap_pairs.insert(thread_set);
+			}
+		}
+		
+		
+	}
+    finish = std::chrono::high_resolution_clock::now();
+    elapsed = finish - start;
+    cout << "\nBuild Vectors took: " << elapsed.count() << " s";
+	
+    // Decide which ORFs to remove based on length
+    start = std::chrono::high_resolution_clock::now();
+    vector<int> remove_indexes;
+
+    // Pre-allocate remove_indexes to avoid race conditions when using push_back
+    size_t num_pairs = overlap_pairs.size();
+    remove_indexes.resize(num_pairs);
+
+    int real_size = 0;  // The real size of remove_indexes, considering that not all iterations will add an element
+
+    //#pragma omp parallel for num_threads(threads) schedule(dynamic) reduction(+:real_size)
+    for (const auto &pair : overlap_pairs) {  
+
+		/*
+        if (orfs[pair.first].gene_id != "X" && orfs[pair.second].gene_id != "X") {
+            continue;
+        }
+		*/
+		
+        int index_to_remove = -1;  // -1 means "do not remove anything"
+
+        if (orfs[pair.first].gene_id != "X" && orfs[pair.second].gene_id == "X") {
+            index_to_remove = pair.second;
+        } else if (orfs[pair.first].gene_id == "X" && orfs[pair.second].gene_id != "X") {
+            index_to_remove = pair.first;
+        } else if (orfs[pair.first].orf_length < orfs[pair.second].orf_length) {
+            index_to_remove = pair.first;
+        } else {
+            index_to_remove = pair.second;
+        }
+
+		#pragma omp critical
+		{
+			remove_indexes[real_size++] = index_to_remove;
+		}
+    }
+
+    // Trim remove_indexes to its real size
+    remove_indexes.resize(real_size);
+	
+    finish = std::chrono::high_resolution_clock::now();
+    elapsed = finish - start;
+    cout << "\nBuild remove took: " << elapsed.count() << " s";
+	
+    // Sort and unique the remove_indexes vector
+    start = std::chrono::high_resolution_clock::now();
+    sort(remove_indexes.begin(), remove_indexes.end());
+    auto last = unique(remove_indexes.begin(), remove_indexes.end());
+    remove_indexes.erase(last, remove_indexes.end());
+    finish = std::chrono::high_resolution_clock::now();
+    elapsed = finish - start;
+    cout << "\nUnique took: " << elapsed.count() << " s";
+    // Remove ORFs
+
+	// Convert remove_indexes vector to a set for quick lookup
+	set<int> remove_indexes_set(remove_indexes.begin(), remove_indexes.end());		
+	
+
+	// Create a new vector to hold the CandidateORF objects to keep
+
+	vector<CandidateORF> new_orfs;
+	
+	for (int i = 0; i < orfs.size(); ++i) {
+		if (remove_indexes_set.find(i) == remove_indexes_set.end()) {
+			// This index is not in the remove_indexes list, so keep it
+			new_orfs.emplace_back(orfs[i]);
+		}
+	}
+	// Replace the original orfs vector with the new vector
+	orfs = std::move(new_orfs);
+	new_orfs.clear();
+}
+void find_intersect_ann_threaded(vector<CandidateORF> &orfs, vector<GTF> &anns, map<string,CDS> &cds, int threads,  map<string, int> &chr_labels)
+{
+    #pragma omp parallel for num_threads(threads) schedule(dynamic)
+	for(int curchr=0; curchr<chr_labels.size(); curchr++){
+		int canonical_count =0;
+		int ann_start_index = 0;
+		int splice_count=0;
+		for (int i = 0; i < orfs.size(); i++)
+		{
+			CandidateORF &my_orf = orfs[i];
+			if(curchr!=my_orf.chr){
+				continue;
+			}
+			my_orf.gene_id="X";
+			while (anns[ann_start_index].chr < my_orf.chr || my_orf.start_codon_pos-anns[ann_start_index].end>1000000)
+			{
+				ann_start_index++;
+			}
+			for (int j = ann_start_index; j < anns.size(); j++)
+			{
+				GTF& my_ann = anns[j];
+				if (my_ann.chr > my_orf.chr || my_ann.start > my_orf.stop_codon_pos)
+				{
+					break;
+				}
+				//intersect on opposite strand
+				if (my_orf.chr == my_ann.chr && my_orf.strand != my_ann.strand && (
+					(my_orf.start_codon_pos <= my_ann.start && my_orf.stop_codon_pos >= my_ann.start) ||
+					(my_orf.start_codon_pos <= my_ann.end && my_orf.stop_codon_pos >= my_ann.end) ||
+					(my_orf.start_codon_pos >= my_ann.start && my_orf.stop_codon_pos <= my_ann.end) ||
+					(my_orf.start_codon_pos <= my_ann.start && my_orf.stop_codon_pos >= my_ann.end)))
+				{
+					if (my_ann.annotation_type == "exon")
+					{
+						my_orf.antisense_gene = my_ann.gene_id;
+					}
+
+				}
+				//intersect on same strand
+				if (my_orf.chr == my_ann.chr && my_orf.strand == my_ann.strand && (
+					(my_orf.start_codon_pos <= my_ann.start && my_orf.stop_codon_pos >= my_ann.start) ||
+					(my_orf.start_codon_pos <= my_ann.end && my_orf.stop_codon_pos >= my_ann.end) ||
+					(my_orf.start_codon_pos >= my_ann.start && my_orf.stop_codon_pos <= my_ann.end) ||
+					(my_orf.start_codon_pos <= my_ann.start && my_orf.stop_codon_pos >= my_ann.end)))
+				{
+					/*
+					if (my_ann.annotation_type == "exon")
+					{
+						if (my_ann.gene_biotype == "lncRNA")
+						{
+							my_orf.lncrna = true;
+						}
+						else if (my_ann.gene_biotype == "transcribed_unprocessed_pseudogene"||my_ann.gene_biotype=="unprocessed_pseudogene")
+						{
+							my_orf.unprocessed_pseudogene = true;
+						}
+						else if (my_ann.gene_biotype == "protein_coding")
+						{
+							my_orf.protein_coding = true;
+						}
+						else if (my_ann.gene_biotype == "processed_pseudogene")
+						{
+							my_orf.processed_pseudogene = true;
+						}
+						else
+						{
+							my_orf.biotype_other = my_ann.gene_biotype;
+						}
+						my_orf.intersect_gene = my_ann.gene_id;
+					}
+					else if (my_ann.annotation_type == "five_prime_utr")
+					{
+						my_orf.intersect_five_utr = my_ann.gene_id;
+					}
+					else if (my_ann.annotation_type == "three_prime_utr")
+					{
+						my_orf.intersect_three_utr = my_ann.gene_id;
+					}
+					*/
+					if (my_ann.annotation_type == "CDS")
+					{
+						my_orf.CDS_intersect = my_ann.gene_id;
+						if(my_ann.spliced_gene){
+							splice_count++;
+						}
+						my_orf.CDS_biotype = my_ann.gene_biotype;
+						string cds_id=my_ann.ccds_id;
+						if(cds_id=="")
+						{
+							cds_id=my_ann.transcript_id;
+						}
+						if(my_orf.strand==0)
+						{
+							if(abs(cds[cds_id].start-my_orf.start_codon_pos)<=4 && abs(cds[cds_id].end-my_orf.stop_codon_pos)<=4)
+							//if(cds.at(cds_id).start==orfs[i].start_codon_pos && cds.at(cds_id).end+3==orfs[i].stop_codon_pos)
+
+							{   
+								canonical_count++;
+								my_orf.gene_id = my_ann.gene_id;
+
+								if(my_orf.gene_id=="X"){
+									my_orf.gene_id="canonical";
+								}
+								my_orf.orf_annotation_type = my_ann.annotation_type;
+								my_orf.orf_gene_biotype = my_ann.gene_biotype;
+							}
+						}
+						if(my_orf.strand==1)
+						{
+							if(abs(cds[cds_id].start-my_orf.start_codon_pos)<=3 && abs(cds[cds_id].end-my_orf.stop_codon_pos)<=3)
+							//if(cds.at(cds_id).start-3==orfs[i].start_codon_pos && cds.at(cds_id).end==orfs[i].stop_codon_pos)
+							{   
+								canonical_count++;
+
+								my_orf.gene_id = my_ann.gene_id;
+								if(my_orf.gene_id=="X"){
+									my_orf.gene_id="canonical";
+								}
+								my_orf.orf_annotation_type = my_ann.annotation_type;
+								my_orf.orf_gene_biotype = my_ann.gene_biotype;
+							}
+						}
+					}
+				}
+			}
+		}
+		cout << "\nCanonical genes: " << to_string(canonical_count);
+		cout << "\nSpliced gene overlaps: " << to_string(splice_count);
+	}
+}
 
 
 void find_intersect_ann(vector<CandidateORF> &orfs, vector<GTF> &anns, map<string,CDS> &cds, int threads)
@@ -1453,7 +1838,7 @@ void find_intersect_ann(vector<CandidateORF> &orfs, vector<GTF> &anns, map<strin
 	for (int i = 0; i < orfs.size(); i++)
 	{
 		CandidateORF &my_orf = orfs[i];
-		my_orf.gene_id="";
+		my_orf.gene_id="X";
 		while (anns[ann_start_index].chr < my_orf.chr || my_orf.start_codon_pos-anns[ann_start_index].end>1000000)
 		{
 			ann_start_index++;
@@ -1531,14 +1916,14 @@ void find_intersect_ann(vector<CandidateORF> &orfs, vector<GTF> &anns, map<strin
 					}
                     if(my_orf.strand==0)
                     {
-                        //if(abs(cds[cds_id].start-my_orf.start_codon_pos)<=3 && abs(cds[cds_id].end-my_orf.stop_codon_pos)<=3)
-						if(cds.at(cds_id).start==orfs[i].start_codon_pos && cds.at(cds_id).end+3==orfs[i].stop_codon_pos)
+                        if(abs(cds[cds_id].start-my_orf.start_codon_pos)<=3 && abs(cds[cds_id].end-my_orf.stop_codon_pos)<=3)
+						//if(cds.at(cds_id).start==orfs[i].start_codon_pos && cds.at(cds_id).end+3==orfs[i].stop_codon_pos)
 
                         {   
 							canonical_count++;
                             my_orf.gene_id = my_ann.gene_id;
 
-							if(my_orf.gene_id==""){
+							if(my_orf.gene_id=="X"){
 								my_orf.gene_id="canonical";
 							}
                             my_orf.orf_annotation_type = my_ann.annotation_type;
@@ -1547,13 +1932,13 @@ void find_intersect_ann(vector<CandidateORF> &orfs, vector<GTF> &anns, map<strin
                     }
                     if(my_orf.strand==1)
                     {
-                        //if(abs(cds[cds_id].start-my_orf.start_codon_pos)<=3 && abs(cds[cds_id].end-my_orf.stop_codon_pos)<=3)
-						if(cds.at(cds_id).start-3==orfs[i].start_codon_pos && cds.at(cds_id).end==orfs[i].stop_codon_pos)
+                        if(abs(cds[cds_id].start-my_orf.start_codon_pos)<=3 && abs(cds[cds_id].end-my_orf.stop_codon_pos)<=3)
+						//if(cds.at(cds_id).start-3==orfs[i].start_codon_pos && cds.at(cds_id).end==orfs[i].stop_codon_pos)
 						{   
 							canonical_count++;
 
                             my_orf.gene_id = my_ann.gene_id;
-							if(my_orf.gene_id==""){
+							if(my_orf.gene_id=="X"){
 								my_orf.gene_id="canonical";
 							}
                             my_orf.orf_annotation_type = my_ann.annotation_type;
@@ -1747,32 +2132,29 @@ void read_genes(vector<GeneModel> & gene_models,string filename, bool annotated_
 		split(line, ' ', column_data);
 		
 		//If the gene is noncanonical and we only want annotated, skip it
-		if(annotated_only && column_data[3] == ""){
+		if(annotated_only && column_data[2] == "X"){
 			continue;
 		}
 		GeneModel my_gene_model = GeneModel();
 		//my_gene_model.species = column_data[1];
 		//my_gene_model.transcript_id = column_data[2];
-		my_gene_model.gene_id = column_data[3];
-		my_gene_model.chr = stoi(column_data[4]);
-		my_gene_model.strand = stoi(column_data[5]);
-		my_gene_model.start_codon_pos = stoi(column_data[6]);
-		my_gene_model.stop_codon_pos = stoi(column_data[7]);
-		my_gene_model.orf_length = stoi(column_data[19]);
+		my_gene_model.gene_id = column_data[2];
+		my_gene_model.chr = stoi(column_data[3]);
+		my_gene_model.strand = stoi(column_data[4]);
+		my_gene_model.start_codon_pos = stoi(column_data[5]);
+		my_gene_model.stop_codon_pos = stoi(column_data[6]);
+		my_gene_model.orf_length = stoi(column_data[8]);
 
-		vector<string> exon_starts;
-		split(column_data[8], ',', exon_starts);
-		vector<string> exon_stops;
-		split(column_data[9], ',', exon_stops);
-		vector<string> exon_coding;
-		split(column_data[10], ',', exon_coding);
+		vector<string> exons;
+		split(column_data[7], ',', exons);
 
-		for (int i = 0; i < exon_starts.size(); i++)
+		for (int i = 0; i < exons.size(); i++)
 		{
 			Exon my_exon = Exon();
-			my_exon.start = stoi(exon_starts[i]);
-			my_exon.end = stoi(exon_stops[i]);
-			my_exon.is_coding = stoi(exon_coding[i]);
+			vector<string> exon_string;
+			split(exons[i], '-', exon_string);
+			my_exon.start = stoi(exon_string[0]);
+			my_exon.end = stoi(exon_string[1]);
 			my_gene_model.exons.emplace_back(my_exon);
 
 		}
@@ -2541,11 +2923,12 @@ double binom_test(int k, int n, double p)
     return pval;
 }
 
-void assign_reads_to_orfs(vector<GeneModel> &all_orfs, vector<map<int, int>> &reads_map_f, vector<map<int, int>> &reads_map_r, int threads) {
+void assign_reads_to_orfs(vector<GeneModel> &all_orfs, vector<map<int, int>> &reads_map_f, vector<map<int, int>> &reads_map_r, int threads, string output_dir) {
    
     // Seed with a fixed number
     default_random_engine engine(42);
 	
+	vector<vector<int>> all_exon_pos_reads(all_orfs.size());
 	
 	#pragma omp parallel for num_threads(threads)
     for (int i = 0; i < all_orfs.size(); i++) {
@@ -2621,6 +3004,10 @@ void assign_reads_to_orfs(vector<GeneModel> &all_orfs, vector<map<int, int>> &re
 			my_orf.frame_reads[2]+=third;
 		}
 		
+		#pragma omp critical
+		{
+			all_exon_pos_reads[i] = exon_pos_reads;
+		}
 		
 		for(int k=0; k<100; k++){
 			//Find scrambled data
@@ -2688,6 +3075,41 @@ void assign_reads_to_orfs(vector<GeneModel> &all_orfs, vector<map<int, int>> &re
 		my_orf.frame = vector<int>();
     }
 	
+	
+	ofstream file(output_dir + "orfs_reads");	
+	file << "id reads";
+    ostringstream buffer;
+
+    for(int i = 0; i < all_exon_pos_reads.size(); ++i) {
+        vector<int> &cur_reads = all_exon_pos_reads[i];
+		bool has_read=false;
+		int csize = cur_reads.size() - 1;
+        for(int j = 0; j < cur_reads.size(); ++j) {
+			if(cur_reads[j]!=0){
+				if(!has_read){
+					buffer << "\n";
+					buffer << i << " ";
+				}
+				has_read=true;
+				buffer << j << "-" << cur_reads[j];
+				if (j < csize) {
+					buffer << ",";
+				}
+			}
+        }
+
+        // Optional: flush buffer to file when it reaches a certain size
+        if(buffer.tellp() >= 4096) {
+            file << buffer.str();
+            buffer.str("");
+            buffer.clear();
+        }
+    }
+
+    // Flush remaining buffer to file
+    if (buffer.tellp() > 0) {
+        file << buffer.str();
+    }
 	
 }
 
@@ -2927,7 +3349,9 @@ if(runMode=="GetCandidateORFs")
 	cout << "\n" << canonical_gene_annotation_path;
 	
 
+	
 	if(gff){
+		cout << "\nReading gff file";
 		read_gff3(annotations2, canonical_gene_annotation_path, chr_labels);
 	} else {
 		read_gtf_original(annotations2, canonical_gene_annotation_path, chr_labels, true);
@@ -2991,6 +3415,14 @@ if(runMode=="GetCandidateORFs")
 		transcripts.clear();
 		
 		start = std::chrono::high_resolution_clock::now();
+		expand_candidate_orfs(orfs, threads); 
+		finish = std::chrono::high_resolution_clock::now();
+		elapsed = finish - start;
+		cout << "\nexpand_gene_models took: " << elapsed.count() << " s";
+		cout << "\nexpand gene models: "<<orfs.size();;
+		
+		/*
+		start = std::chrono::high_resolution_clock::now();
 		filter_duplicate_orfs(orfs, threads);
 		finish = std::chrono::high_resolution_clock::now();
 		elapsed = finish - start;
@@ -3002,14 +3434,71 @@ if(runMode=="GetCandidateORFs")
 		finish = std::chrono::high_resolution_clock::now();
 		elapsed = finish - start;
 		cout << "\nfilter_overlapping_orfs took: " << elapsed.count() << " s";
-		cout << "\norfs remaining after overlap filtering: " << orfs.size();
-		
-		start = std::chrono::high_resolution_clock::now();
-		expand_candidate_orfs(orfs, threads); 
-		finish = std::chrono::high_resolution_clock::now();
-		elapsed = finish - start;
-		cout << "\nexpand_gene_models took: " << elapsed.count() << " s";
-		cout << "\nexpand gene models: "<<orfs.size();;
+		*/
+	
+
+
+
+
+    start = std::chrono::high_resolution_clock::now();
+    sort(orfs.begin(), orfs.end());
+    finish = std::chrono::high_resolution_clock::now();
+    elapsed = finish - start;
+    cout << "\nsort took: " << elapsed.count() << " s";
+    cout << "\nsort ORFs";
+	
+    start = std::chrono::high_resolution_clock::now();
+    find_intersect_ann_threaded(orfs, annotations2, cds, threads, chr_labels);
+    finish = std::chrono::high_resolution_clock::now();
+    elapsed = finish - start;
+    cout << "\nfind_intersect_ann took: " << elapsed.count() << " s";
+
+
+	//Print every possible ORF
+    start = std::chrono::high_resolution_clock::now();
+
+    ofstream file(output_dir + "all_orfs");
+	file << "id transcript_id gene_id chr strand orf_start orf_stop genomic_coordinates orf_length antisense_gene CDS_intersect chr_str";
+	file.close();
+	int orf_index = 0;
+    print_genes(orfs, output_dir + "all_orfs",0, orf_index);
+    print_genes(orfs, output_dir + "all_orfs",1, orf_index);
+    finish = std::chrono::high_resolution_clock::now();
+    elapsed = finish - start;
+    cout << "\nprinting genes took: " << elapsed.count() << " s";
+	
+    start = std::chrono::high_resolution_clock::now();
+	//filter_longest_and_canonical(orfs, false);
+    finish = std::chrono::high_resolution_clock::now();
+    elapsed = finish - start;
+    cout << "\nfilter longest and canonical took: " << elapsed.count() << " s";
+	
+
+    start = std::chrono::high_resolution_clock::now();
+
+	filter_splice_frame_overlap(orfs, threads, chr_labels);
+
+	
+    finish = std::chrono::high_resolution_clock::now();
+    elapsed = finish - start;
+    cout << "\nfilter_splice_frame_overlap took: " << elapsed.count() << " s";
+	
+	
+    start = std::chrono::high_resolution_clock::now();
+
+	
+
+
+	cout << "\norfs remaining after overlap filtering: " << orfs.size();
+
+
+
+
+
+
+
+
+
 
 	} else{
 		start = std::chrono::high_resolution_clock::now();
@@ -3017,64 +3506,55 @@ if(runMode=="GetCandidateORFs")
 		finish = std::chrono::high_resolution_clock::now();
 		elapsed = finish - start;
 		cout << "\nget_orfs took: " << elapsed.count() << " s";
+		
+		start = std::chrono::high_resolution_clock::now();
+		sort(orfs.begin(), orfs.end());
+
+		finish = std::chrono::high_resolution_clock::now();
+		elapsed = finish - start;
+		cout << "\nsort took: " << elapsed.count() << " s";
+		cout << "\nsort ORFs";
+
+		start = std::chrono::high_resolution_clock::now();
+		find_intersect_ann_threaded(orfs, annotations2, cds, threads, chr_labels);
+		finish = std::chrono::high_resolution_clock::now();
+		elapsed = finish - start;
+		cout << "\nfind_intersect_ann took: " << elapsed.count() << " s";
+
+		//Print every possible ORF
+		ofstream file(output_dir + "all_orfs");
+		file << "id transcript_id gene_id chr strand orf_start orf_stop genomic_coordinates orf_length antisense_gene CDS_intersect chr_str";
+		file.close();
+		int orf_index = 0;
+		print_genes(orfs, output_dir + "all_orfs",0, orf_index);
+		print_genes(orfs, output_dir + "all_orfs",1, orf_index);
+		
+	
+		filter_duplicate_orfs(orfs, threads);
+		
+		
+		filter_longest_and_canonical(orfs, true);
 	}
 
-    start = std::chrono::high_resolution_clock::now();
-    //get_orf_chr_str(orfs,chr_labels, threads);
-    finish = std::chrono::high_resolution_clock::now();
-    elapsed = finish - start;
-    cout << "\nget_orf_chr_str took: " << elapsed.count() << " s";
-    cout << "\nget orfs: " << orfs.size();
 
-
-    start = std::chrono::high_resolution_clock::now();
-    //get_gene_seq_speedy(orfs, genome, threads);
-    finish = std::chrono::high_resolution_clock::now();
-    elapsed = finish - start;
-    cout << "\nget_gene_seq took: " << elapsed.count() << " s";
-    cout << "\nget gene seqs";
 	
 	genome.clear();
     
 
-    start = std::chrono::high_resolution_clock::now();
-    sort(orfs.begin(), orfs.end());
 
-    finish = std::chrono::high_resolution_clock::now();
-    elapsed = finish - start;
-    cout << "\nsort took: " << elapsed.count() << " s";
-    cout << "\nsort ORFs";
 
-    start = std::chrono::high_resolution_clock::now();
-    //filter_orfs(orfs, threads); DO THIS IN GET ORFS
-    finish = std::chrono::high_resolution_clock::now();
-    elapsed = finish - start;
-    cout << "\nfilter_orfs took: " << elapsed.count() << " s";
-    
 
-    start = std::chrono::high_resolution_clock::now();
-    find_intersect_ann(orfs, annotations2, cds, threads);
-    finish = std::chrono::high_resolution_clock::now();
-    elapsed = finish - start;
-    cout << "\nfind_intersect_ann took: " << elapsed.count() << " s";
-
-	/*for(GTF& ann :annotations2){
-		if(ann.gene_id!=""){
-			cout << "\n" << ann.gene_id;
-		}
-	}*/
 	annotations2.clear();
 	cds.clear();
 	
-    vector<vector<CandidateORF>> gene_models_shell;
-    gene_models_shell.emplace_back(orfs);
+
     start = std::chrono::high_resolution_clock::now();
     ofstream file(output_dir + "candidate_orfs"); // Open the file in append mode
-	file << "id species transcript_id gene_id chr strand start stop exon_starts exon_stops exon_coding num_agree pos_agree lncrna processed_pseudogene unprocessed_pseudogene protein_coding biotype_other intersect_gene_id orf_length age_class secondary_gene_id exon_count intersect_five_utr intersect_three_utr uorf_id dorf_id antisense_gene CDS_intersect CDS_biotype orf_annotation_type orf_gene_biotype chr_str sequence";
+	file << "id transcript_id gene_id chr strand orf_start orf_stop genomic_coordinates orf_length antisense_gene CDS_intersect chr_str";
 	file.close();
 	int orf_index = 0;
-    print_genes(gene_models_shell, output_dir + "candidate_orfs",0, orf_index);
-    print_genes(gene_models_shell, output_dir + "candidate_orfs",1, orf_index);
+    print_genes(orfs, output_dir + "candidate_orfs",0, orf_index);
+    print_genes(orfs, output_dir + "candidate_orfs",1, orf_index);
     finish = std::chrono::high_resolution_clock::now();
     elapsed = finish - start;
     cout << "\nprint_genes took: " << elapsed.count() << " s";
@@ -3276,7 +3756,7 @@ if(runMode=="GetCandidateORFs")
 		read_genes(all_orfs, candidate_orfs_path, false);
 		expand_gene_models_old(all_orfs);
 		
-		assign_reads_to_orfs(all_orfs, all_passed_reads_f,all_passed_reads_r, threads);
+		assign_reads_to_orfs(all_orfs, all_passed_reads_f,all_passed_reads_r, threads, output_dir);
 		//print_gene_reads_new(all_orfs, output_dir + "orfs_reads"); // _"+to_string(align_start)  + "_" + to_string(align_end)  + "_" + to_string(cutoff)  + "_" + to_string(required_frame_difference));
 
 		//Print translation statistics, and tracks
