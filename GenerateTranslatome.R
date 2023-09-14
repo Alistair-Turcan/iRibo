@@ -47,7 +47,10 @@ orfs_file <- getArg(parsedArgs, "CandidateORFs", "", TRUE)
 null_file <- getArg(parsedArgs, "NullDistribution", "", TRUE)
 
 threads <- as.integer(getArg(parsedArgs, "Threads", "1", FALSE))
-
+num_scrambles <- as.integer(getArg(parsedArgs, "Scrambles", "100", FALSE))
+if(num_scrambles>100){
+	num_scrambles=100
+}
 exclude_chr_input <- getArg(parsedArgs, "ExcludeCHR", "", FALSE)
 exclude_chr <- strsplit(exclude_chr_input, ",")[[1]]
 
@@ -63,24 +66,20 @@ if(output_dir!=""){
 
 #Load in calls file from TranslationCalls, and original list of orfs from GetCandidateORFs
 calls<-read.csv(calls_file,sep=" ",stringsAsFactors=F)
-orfs<-read.csv(orfs_file, sep=" ",stringsAsFactors=F)
+# Specify the column names
+
+# Read the CSV file
+orfs <- read.csv(orfs_file, sep=" ", header=TRUE, stringsAsFactors=F)
+
 nulldist<-read.csv(null_file,sep=" ",stringsAsFactors=F)
 
 FDR  <- as.numeric(getArg(parsedArgs, "FDR", "0.05", FALSE))
 
 library(scales)
 library(parallel)
-
-
-if (!requireNamespace("ggplot2", quietly = TRUE)) {
-  install.packages("ggplot2")
-}
 library(ggplot2)
-
-if (!requireNamespace("future.apply", quietly = TRUE)) {
-  install.packages("future.apply")
-}
 library("future.apply")
+
 plan(multicore, workers = threads) #Enables multithreading
 
 print(Sys.time() - time1)
@@ -165,15 +164,19 @@ if(min(ribo_bin)==1){
 
 #candidate_index<-all_index[which((overlaps$sense_ver+overlaps$sense_unchar+overlaps$sense_te+overlaps$sense_blocked)[all_index]==0)]
 
-canonical_index <- which(orfs$gene_id != "")
+canonical_index <- which(orfs$gene_id != "X")
 #canonical_index <- which(orfs$orf_class %in% c("Verified", "Uncharacterized", "transposable_element_gene"))
 
-noncanonical_index <- which(orfs$gene_id == "")
+noncanonical_index <- which(orfs$gene_id == "X")
+print(length(noncanonical_index))
+
 if(exclude_overlap_gene == "true"){
 	print("Excluding Overlapping nORFs")
 	noncanonical_index <- intersect(noncanonical_index, which(orfs$CDS_intersect == "X"))
 
 }
+print(length(canonical_index))
+
 print(length(noncanonical_index))
 noncanonical_index <- intersect(noncanonical_index, which(!(orfs$chr_str %in% exclude_chr)))
 canonical_index <- intersect(canonical_index, which(!(orfs$chr_str %in% exclude_chr)))
@@ -334,3 +337,31 @@ translated_cORFs$p_value <- p_values
 write.table(translated_cORFs, output, sep=",", row.names=FALSE, col.names = FALSE, append=TRUE)
 
 
+# Construct plot title for canonical ORFs
+my_title_canon = paste("P-value: ", my_p_canon)
+my_title_canon = paste(my_title_canon, " ORFs Found: ")
+my_title_canon = paste(my_title_canon, orfs_found_canon)
+
+# Plot for canonical ORFs
+f1c_canon <- ggplot(df_hits_canonical, aes(x = pvals, y = hits, linetype = hit_type)) +
+  geom_line(size = 1, col = 'red') +
+  scale_color_manual(values = c("#7C4DFF", "#9C27B0")) +
+  labs(x = "P-value threshold", y = "Translated cORFs found") +
+  geom_vline(xintercept = which.min(abs(scrambled_hits_canonical / num_hits_canonical - FDR)) / 10000, linetype = "dashed", color = "black", size = 1.0) +
+  scale_y_continuous() +
+  theme_linedraw() +
+  ggtitle(my_title_canon) +
+  theme(plot.title = element_text(size = titles, face = "bold"),
+        axis.title = element_text(size = titles),
+        axis.text = element_text(size = txt),
+        legend.title = element_blank(),
+        legend.text = element_text(size = txt),
+        legend.position = c(.8, .7),
+        legend.background = element_rect(fill = 'transparent'))
+f1c_canon
+
+# Save the plot
+plot_output_canon = paste(output_dir, "cORF_discovery.png", sep = "")
+png(plot_output_canon)
+plot(f1c_canon)
+dev.off()
