@@ -79,8 +79,11 @@ To run:
 
 SAMs File:
 sams.txt should list paths to all SAM/BAM files, separated by lines:
+
 e.g., 
+
 sam_dir/SRR1042853_aligned.out.bam
+
 sam_dir/SRR1042855_aligned.out.bam
 
 Options:
