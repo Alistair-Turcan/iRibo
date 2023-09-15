@@ -52,7 +52,9 @@ Note:
 
 ## GetCandidateORFs:
 
-Begin by generating candidate ORFs for translation assessment. This results in a file "candidate_orfs" with potential ORFs.
+Begin by generating candidate ORFs for translation assessment. This results in two files:
+- candidate_orfs: A list of all candidate ORFs that will be assessed for translation. This is filtered due to overlapping translation signals being hard to separate.
+- all_orfs: A list of every possible ORF that exists in the genome or transcriptome.
 
 ./iRibo --RunMode=GetCandidateORFs --Genome=path/to/genome.fa --Annotations=path/to/annotations.gtf
 
@@ -102,7 +104,8 @@ Options:
 
 This final step creates the translatome, yielding:
 - translated_orfs.csv: Data on translated ORFs.
-- nORF_discovery.png: Graph for p-values of real vs. scrambled ORFs and FDR cutoff.
+- nORF_discovery.png: Graph for p-values of real vs. scrambled nORFs and FDR cutoff.
+- cORF_discovery.png: Graph for p-values of real vs. scrambled cORFs and FDR cutoff.
 
 To run:
 Rscript GenerateTranslatome.R --TranslationCalls=path/to/translation_calls --NullDistribution=path/to/null_distribution --CandidateORFs=path/to/candidate_orfs
