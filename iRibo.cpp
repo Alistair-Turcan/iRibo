@@ -1572,12 +1572,16 @@ void filter_splice_frame_overlap(vector<CandidateORF> &orfs, int threads,  map<s
 							for (int l = 0; l < cur_pos.size(); l++) {
 								if (i!=cur_pos[l].second && cur_frame == cur_pos[l].first) {
 
-									overlap_pairs_thread.insert({i, cur_pos[l].second });
+									if(i>cur_pos[l].second){
+										overlap_pairs_thread.insert({cur_pos[l].second, i });
+									} else{
+										overlap_pairs_thread.insert({i, cur_pos[l].second });
+									}
 									fin = true;
 								}
 							}
 						}
-	
+
 						cur_frame++;
 						if (cur_frame == 3) {
 							cur_frame = 0;
@@ -1597,7 +1601,12 @@ void filter_splice_frame_overlap(vector<CandidateORF> &orfs, int threads,  map<s
 							for (int l = 0; l < cur_pos.size(); l++) {
 								if (i!=cur_pos[l].second && cur_frame == cur_pos[l].first) {
 
-									overlap_pairs_thread.insert({i, cur_pos[l].second });
+	
+									if(i>cur_pos[l].second){
+										overlap_pairs_thread.insert({cur_pos[l].second, i });
+									} else{
+										overlap_pairs_thread.insert({i, cur_pos[l].second });
+									}
 									fin =true;
 								}
 							}
@@ -1639,19 +1648,24 @@ void filter_splice_frame_overlap(vector<CandidateORF> &orfs, int threads,  map<s
     //#pragma omp parallel for num_threads(threads) schedule(dynamic) reduction(+:real_size)
     for (const auto &pair : overlap_pairs) {  
 
-		/*
-        if (orfs[pair.first].gene_id != "X" && orfs[pair.second].gene_id != "X") {
+		
+		CandidateORF &orf1 = orfs[pair.first];
+		CandidateORF &orf2 = orfs[pair.second];
+
+		//Don't remove overlapping canonicals when they are different
+        if (orf1.gene_id != "X" && orf2.gene_id != "X" && orf2.gene_id != orf1.gene_id) {
             continue;
         }
-		*/
+		
 		
         int index_to_remove = -1;  // -1 means "do not remove anything"
 
-        if (orfs[pair.first].gene_id != "X" && orfs[pair.second].gene_id == "X") {
+		//Remove either the noncanonical, or the shorter
+        if (orf1.gene_id != "X" && orf2.gene_id == "X") {
             index_to_remove = pair.second;
-        } else if (orfs[pair.first].gene_id == "X" && orfs[pair.second].gene_id != "X") {
+        } else if (orf1.gene_id == "X" && orf2.gene_id != "X") {
             index_to_remove = pair.first;
-        } else if (orfs[pair.first].orf_length < orfs[pair.second].orf_length) {
+        } else if (orf1.orf_length < orf2.orf_length) {
             index_to_remove = pair.first;
         } else {
             index_to_remove = pair.second;
