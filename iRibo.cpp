@@ -3213,7 +3213,7 @@ void outputTracks(vector<map<int,int>>& passed_reads_f, vector<map<int,int>>& pa
         buffer_plus += "variableStep chrom=" + kv.first + "\n";
         for(auto& kv2 : passed_reads_f[kv.second])
         {
-            buffer_plus += std::to_string(kv2.first) + " " + std::to_string(kv2.second) + "\n";
+            buffer_plus += std::to_string(kv2.first+1) + " " + std::to_string(kv2.second) + "\n";
         }
         file_plus << buffer_plus;
         buffer_plus = ""; //clear the buffer
@@ -3221,7 +3221,7 @@ void outputTracks(vector<map<int,int>>& passed_reads_f, vector<map<int,int>>& pa
         buffer_minus += "variableStep chrom=" + kv.first + "\n";
         for(auto& kv2 : passed_reads_r[kv.second])
         {
-            buffer_minus += std::to_string(kv2.first) + " " + std::to_string(kv2.second) + "\n";
+            buffer_minus += std::to_string(kv2.first+1) + " " + std::to_string(kv2.second) + "\n";
         }
         file_minus << buffer_minus;
         buffer_minus = ""; //clear the buffer
