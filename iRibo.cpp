@@ -1440,6 +1440,7 @@ void print_genes(vector<CandidateORF> &orfs,string filename, int strand, int& or
 
     std::ofstream file(filename, std::ios::app); // Open the file in append mode
 
+	vector<string> strandchar= {"+", "-"};
 	for (int i = 0; i < orfs.size(); i++)
 	{
 		CandidateORF& my_orf = orfs[i];
@@ -2140,6 +2141,8 @@ void read_genes(vector<GeneModel> & gene_models,string filename, bool annotated_
 	ifstream file(filename);
 	string line;
 	getline(file, line);
+	map<string, int> strandchar = {{"+", 0}, {"-", 1}};
+	
 	while (getline(file, line))
 	{
 		vector<string> column_data;
