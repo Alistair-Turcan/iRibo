@@ -39,7 +39,7 @@ A comprehensive tool for integrating ribosome profiling data to detect genome wi
 iRibo takes in:
 1. Genome in FASTA format.
 2. Annotations in GFF3 or GTF format.
-3. Transcriptome (optional): Contains both annotated and unannotated transcripts in GFF3 or GTF format.
+3. Transcriptome (optional): Accepts both annotated and unannotated transcripts in GFF3 or GTF format.
 4. Aligned ribo-seq reads in SAM or BAM format.
 
 Recommendation: 
