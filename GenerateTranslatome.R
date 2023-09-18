@@ -365,3 +365,43 @@ plot_output_canon = paste(output_dir, "cORF_discovery.png", sep = "")
 png(plot_output_canon)
 plot(f1c_canon)
 dev.off()
+
+# Define the list of sorted indices that you are interested in
+# Concatenate the two lists
+combined_indices <- c(noncan_indices, canon_indices)
+
+# Sort the combined list
+orf_indices <- sort(combined_indices)
+
+# Initialize a counter for line numbers
+line_number <- 0
+
+# Open the input file for reading
+input_file <- file(paste(output_dir, "candidate_orfs.gff3", sep = ""), "r")
+
+# Open the output file for writing
+output_file <- file(paste(output_dir, "translated_orfs.gff3", sep = ""), "w")
+
+# Loop through each line of the file
+while (TRUE) {
+  # Read a line from the input file
+  line <- readLines(input_file, n = 1)
+  
+  # Break if we reached the end of the file
+  if (length(line) == 0) {
+    break
+  }
+  
+  # Increment the line number counter
+  line_number <- line_number + 1
+  
+  # Check if the line number is in the list of indices
+  if (line_number %in% orf_indices) {
+    # Write the line to the output file
+    writeLines(line, output_file)
+  }
+}
+
+# Close the input and output files
+close(input_file)
+close(output_file)
