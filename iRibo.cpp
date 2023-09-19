@@ -3216,7 +3216,7 @@ void outputTracks(vector<map<int,int>>& passed_reads_f, vector<map<int,int>>& pa
         buffer_plus += "variableStep chrom=" + kv.first + "\n";
         for(auto& kv2 : passed_reads_f[kv.second])
         {
-            buffer_plus += std::to_string(kv2.first+1) + " " + std::to_string(kv2.second) + "\n";
+            buffer_plus += std::to_string(kv2.first+1) + " " + std::to_string(kv2.second+1) + "\n";
         }
         file_plus << buffer_plus;
         buffer_plus = ""; //clear the buffer
@@ -3224,7 +3224,7 @@ void outputTracks(vector<map<int,int>>& passed_reads_f, vector<map<int,int>>& pa
         buffer_minus += "variableStep chrom=" + kv.first + "\n";
         for(auto& kv2 : passed_reads_r[kv.second])
         {
-            buffer_minus += std::to_string(kv2.first+1) + " " + std::to_string(kv2.second) + "\n";
+            buffer_minus += std::to_string(kv2.first+1) + " " + std::to_string(kv2.second+1) + "\n";
         }
         file_minus << buffer_minus;
         buffer_minus = ""; //clear the buffer
@@ -3235,7 +3235,7 @@ void outputTracks(vector<map<int,int>>& passed_reads_f, vector<map<int,int>>& pa
         GeneModel& my_orf = orfs[i];
         for(int j=0;j<my_orf.exons.size();j++)
         {
-            buffer_file += rev_chr_labels[my_orf.chr] + "\tiRibo\tCDS\t" + std::to_string(my_orf.exons[j].start) + "\t" + std::to_string(my_orf.exons[j].end) + "\t.\t";
+            buffer_file += rev_chr_labels[my_orf.chr] + "\tiRibo\tCDS\t" + std::to_string(my_orf.exons[j].start+1) + "\t" + std::to_string(my_orf.exons[j].end+1) + "\t.\t";
             buffer_file += (my_orf.strand==0 ? "+" : "-");
             buffer_file += "\t0\tID=candidate_orf" + std::to_string(i) + "\n";
         }
