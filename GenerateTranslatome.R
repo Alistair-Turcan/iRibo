@@ -82,7 +82,7 @@ library("future.apply")
 
 plan(multicore, workers = threads) #Enables multithreading
 
-print(Sys.time() - time1)
+#print(Sys.time() - time1)
 time1 = Sys.time()
 
 options(future.globals.maxSize = 10000 * 1024^2) # 600 MiB
@@ -114,13 +114,13 @@ clusterExport(cl = makeCluster(threads), varlist = c("calls"))
 # Use future_lapply to apply the calc_binom_false function to each index in parallel
 results <- future_lapply(1:length(orfs[,1]), calc_binom_false)
 
-print(Sys.time() - time1)
+#print(Sys.time() - time1)
 time1 = Sys.time()
 
 # Combine the results into a single vector
 scram_bin <- do.call("rbind", results)  # Each row represents an ORF, each column a scrambled bin
 
-print(Sys.time() - time1)
+#print(Sys.time() - time1)
 time1 = Sys.time()
 
 # Define a function to calculate the binom.test for a single index i
@@ -147,7 +147,7 @@ results <- future_lapply(1:length(orfs[,1]), function(i) calc_binom_true(i))
 
 # Combine the results into a single vector
 ribo_bin <- unlist(results)
-print(Sys.time() - time1)
+#print(Sys.time() - time1)
 time1 = Sys.time()
 
 #Check for error
@@ -168,28 +168,28 @@ canonical_index <- which(orfs$gene_id != "X")
 #canonical_index <- which(orfs$orf_class %in% c("Verified", "Uncharacterized", "transposable_element_gene"))
 
 noncanonical_index <- which(orfs$gene_id == "X")
-print(length(noncanonical_index))
+#print(length(noncanonical_index))
 
 if(exclude_overlap_gene == "true"){
 	print("Excluding Overlapping nORFs")
 	noncanonical_index <- intersect(noncanonical_index, which(orfs$CDS_intersect == "X"))
 
 }
-print(length(canonical_index))
+#print(length(canonical_index))
 
-print(length(noncanonical_index))
+#print(length(noncanonical_index))
 noncanonical_index <- intersect(noncanonical_index, which(!(orfs$chr_str %in% exclude_chr)))
 canonical_index <- intersect(canonical_index, which(!(orfs$chr_str %in% exclude_chr)))
-print(length(noncanonical_index))
+#print(length(noncanonical_index))
 
 #noncanonical_index <- candidate_index[which(!(orfs$orf_class[candidate_index] %in% c("Verified", "Uncharacterized", "transposable_element_gene")))]
 
-print(length(noncanonical_index))
-print(length(canonical_index))
+#print(length(noncanonical_index))
+#print(length(canonical_index))
 
 
 
-print(Sys.time() - time1)
+#print(Sys.time() - time1)
 time1 = Sys.time()
 
 num_hits_noncanonical<-array()
@@ -227,13 +227,13 @@ for(i in 1:2000) {
   scrambled_hits_canonical[i] <- temp_results$num_canonical$scrambled_hits
 }
 
-print(Sys.time() - time1)
+#print(Sys.time() - time1)
 time1 = Sys.time()
 
 df_hits<-data.frame(pvals=(1:2000)/10000,hits=c(num_hits_noncanonical,scrambled_hits_noncanonical),hit_type=c(rep("Actual",length(num_hits_noncanonical)),rep("Scrambled",length(scrambled_hits_noncanonical))))
 df_hits_canonical<-data.frame(pvals=(1:2000)/10000,hits=c(num_hits_canonical,scrambled_hits_canonical),hit_type=c(rep("Actual",length(num_hits_canonical)),rep("Scrambled",length(scrambled_hits_canonical))))
 
-print(Sys.time() - time1)
+#print(Sys.time() - time1)
 time1 = Sys.time()
 
 ##### FIGURE SIZE
@@ -273,7 +273,7 @@ f1c<- ggplot(df_hits,aes(x=pvals,y=hits,linetype=hit_type))+
         legend.background = element_rect(fill = 'transparent'))
 f1c
 
-print(Sys.time() - time1)
+#print(Sys.time() - time1)
 time1 = Sys.time()
 
 plot_output = paste(output_dir, "nORF Discovery.png", sep = "")
@@ -282,15 +282,15 @@ plot(f1c)
 dev.off()
 
 
-print(Sys.time() - time1)
+#print(Sys.time() - time1)
 time1 = Sys.time()
 
 #Print the indices to a file
 noncan_indices <- noncanonical_index[which(ribo_bin[noncanonical_index] < my_p)]
-write.table(noncan_indices, "orf_indices", col.names=FALSE, row.names=FALSE, quote=FALSE)
+#write.table(noncan_indices, "orf_indices", col.names=FALSE, row.names=FALSE, quote=FALSE)
 
 canon_indices <- canonical_index[which(ribo_bin[canonical_index] < my_p_canon)]
-write.table(canon_indices, "orf_indices_can", col.names=FALSE, row.names=FALSE, quote=FALSE)
+#write.table(canon_indices, "orf_indices_can", col.names=FALSE, row.names=FALSE, quote=FALSE)
 
 # Write each ORF that is indicated in noncan_indices to a file
 translated_nORFs <- orfs[noncan_indices, ]
@@ -368,10 +368,11 @@ dev.off()
 
 # Define the list of sorted indices that you are interested in
 # Concatenate the two lists
-combined_indices <- c(noncan_indices, canon_indices)
+combined_indices_temp <- c(noncan_indices, canon_indices)
 
-# Sort the combined list
-orf_indices <- sort(combined_indices)
+combined_indices <- sapply(combined_indices_temp, function(x) x - 1)
+
+
 
 # Initialize a counter for line numbers
 line_number <- 0
@@ -392,14 +393,23 @@ while (TRUE) {
     break
   }
   
-  # Increment the line number counter
-  line_number <- line_number + 1
+  # Split the line by tabs to get the columns
+  columns <- strsplit(line, "\t")[[1]]
   
-  # Check if the line number is in the list of indices
-  if (line_number %in% orf_indices) {
+  # Get the last column, which contains the ID
+  last_column <- columns[length(columns)]
+  
+  # Extract the ID number using regex
+  id_number <- as.numeric(gsub("ID=candidate_orf", "", last_column))
+  
+  # Check if the ID number is in the list of indices
+  if (!is.na(id_number) && id_number %in% combined_indices) {
     # Write the line to the output file
     writeLines(line, output_file)
   }
+  
+  # Increment the line number counter (optional, since we're not using it now)
+  line_number <- line_number + 1
 }
 
 # Close the input and output files
