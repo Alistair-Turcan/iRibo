@@ -3233,11 +3233,17 @@ void outputTracks(vector<map<int,int>>& passed_reads_f, vector<map<int,int>>& pa
     for(int i=0;i<orfs.size();i++)
     {
         GeneModel& my_orf = orfs[i];
+		int phase = 0;
         for(int j=0;j<my_orf.exons.size();j++)
         {
+			if(j>0)
+			{
+				phase+=(1+my_orf.exons[j-1].end-my_orf.exons[j-1].start)%3;
+				phase=phase%3;
+			}
             buffer_file += rev_chr_labels[my_orf.chr] + "\tiRibo\tCDS\t" + std::to_string(my_orf.exons[j].start+1) + "\t" + std::to_string(my_orf.exons[j].end+1) + "\t.\t";
             buffer_file += (my_orf.strand==0 ? "+" : "-");
-            buffer_file += "\t0\tID=candidate_orf" + std::to_string(i) + "\n";
+            buffer_file += "\t" + std::to_string((3-phase)%3) + "\tID=candidate_orf" + std::to_string(i) + "\n";
         }
         file << buffer_file;
         buffer_file = ""; //clear the buffer
