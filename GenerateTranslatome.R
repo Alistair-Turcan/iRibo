@@ -164,22 +164,22 @@ if(min(ribo_bin)==1){
 
 #candidate_index<-all_index[which((overlaps$sense_ver+overlaps$sense_unchar+overlaps$sense_te+overlaps$sense_blocked)[all_index]==0)]
 
-canonical_index <- which(orfs$gene_id != "X")
+canonical_index <- which(orfs$Gene_ID != "X")
 #canonical_index <- which(orfs$orf_class %in% c("Verified", "Uncharacterized", "transposable_element_gene"))
 
-noncanonical_index <- which(orfs$gene_id == "X")
+noncanonical_index <- which(orfs$Gene_ID == "X")
 #print(length(noncanonical_index))
 
 if(exclude_overlap_gene == "true"){
 	print("Excluding Overlapping nORFs")
-	noncanonical_index <- intersect(noncanonical_index, which(orfs$CDS_intersect == "X"))
+	noncanonical_index <- intersect(noncanonical_index, which(orfs$gene_intersect == "X"))
 
 }
 #print(length(canonical_index))
 
 #print(length(noncanonical_index))
-noncanonical_index <- intersect(noncanonical_index, which(!(orfs$chr_str %in% exclude_chr)))
-canonical_index <- intersect(canonical_index, which(!(orfs$chr_str %in% exclude_chr)))
+noncanonical_index <- intersect(noncanonical_index, which(!(orfs$contig_str %in% exclude_chr)))
+canonical_index <- intersect(canonical_index, which(!(orfs$contig_str %in% exclude_chr)))
 #print(length(noncanonical_index))
 
 #noncanonical_index <- candidate_index[which(!(orfs$orf_class[candidate_index] %in% c("Verified", "Uncharacterized", "transposable_element_gene")))]
@@ -302,7 +302,7 @@ in_frame_reads <- sapply(noncan_indices, function(i) calls[i,]$reads0)
 translated_nORFs$in_frame_reads <- in_frame_reads
 
 # Add 'Expression Level' column to the dataframe
-translated_nORFs$Expression_Level <- translated_nORFs$in_frame_reads / translated_nORFs$orf_length
+translated_nORFs$Expression_Level <- translated_nORFs$in_frame_reads / translated_nORFs$ORF_length
 
 # Extract 'p-values' values corresponding to the noncan_indices
 p_values <- ribo_bin[noncan_indices]
@@ -325,7 +325,7 @@ in_frame_reads <- sapply(canon_indices, function(i) calls[i,]$reads0)
 translated_cORFs$in_frame_reads <- in_frame_reads
 
 # Add 'Expression Level' column to the dataframe
-translated_cORFs$Expression_Level <- translated_cORFs$in_frame_reads / translated_cORFs$orf_length
+translated_cORFs$Expression_Level <- translated_cORFs$in_frame_reads / translated_cORFs$ORF_length
 
 # Extract 'p-values' values corresponding to the canon_indices
 p_values <- ribo_bin[canon_indices]
