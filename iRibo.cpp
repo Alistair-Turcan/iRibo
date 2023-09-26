@@ -3498,7 +3498,7 @@ if(runMode=="GetCandidateORFs")
     start = std::chrono::high_resolution_clock::now();
 
     ofstream file(output_dir + "all_orfs");
-	file << "CandidateORF_ID Transcript_ID Gene_ID contig strand ORF_start ORF_stop genomic_coordinates ORF_length antisense_gene gene_intersect contig_str";
+	file << "CandidateORF_ID Transcript_ID Gene_ID contig strand ORF_coord1 ORF_coord2 genomic_coordinates ORF_length antisense_gene gene_intersect contig_str";
 	file.close();
 	int orf_index = 0;
     print_genes(orfs, output_dir + "all_orfs",0, orf_index);
@@ -3563,7 +3563,7 @@ if(runMode=="GetCandidateORFs")
 
 		//Print every possible ORF
 		ofstream file(output_dir + "all_orfs");
-		file << "id transcript_id gene_id chr strand orf_start orf_stop genomic_coordinates orf_length antisense_gene CDS_intersect chr_str";
+		file << "CandidateORF_ID Transcript_ID Gene_ID contig strand ORF_coord1 ORF_coord2 genomic_coordinates ORF_length antisense_gene gene_intersect contig_str";
 		file.close();
 		int orf_index = 0;
 		print_genes(orfs, output_dir + "all_orfs",0, orf_index);
@@ -3590,7 +3590,7 @@ if(runMode=="GetCandidateORFs")
 
     start = std::chrono::high_resolution_clock::now();
     ofstream file(output_dir + "candidate_orfs"); // Open the file in append mode
-	file << "CandidateORF_ID Transcript_ID Gene_ID contig strand ORF_start ORF_stop genomic_coordinates ORF_length antisense_gene gene_intersect contig_str";
+	file << "CandidateORF_ID Transcript_ID Gene_ID contig strand ORF_coord1 ORF_coord2 genomic_coordinates ORF_length antisense_gene gene_intersect contig_str";
 	file.close();
 	int orf_index = 0;
     print_genes(orfs, output_dir + "candidate_orfs",0, orf_index);
