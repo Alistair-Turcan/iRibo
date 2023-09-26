@@ -1447,10 +1447,10 @@ void print_genes(vector<CandidateORF> &orfs,string filename, int strand, int& or
 		if(my_orf.strand!=strand){ //print by strand
 			continue;
 		}
-		file << "\n" << orf_index <<" "<< my_orf.transcript_id << " " << my_orf.gene_id << " " << my_orf.chr << " " << my_orf.strand << " " << my_orf.start_codon_pos << " " << my_orf.stop_codon_pos << " ";
+		file << "\n" << orf_index <<" "<< my_orf.transcript_id << " " << my_orf.gene_id << " " << my_orf.chr << " " << strandchar[my_orf.strand] << " " << my_orf.start_codon_pos+1 << " " << my_orf.stop_codon_pos+1 << " ";
 		for (int j = 0; j < my_orf.exons.size(); j++)
 		{
-			file << my_orf.exons[j].start << "-" << my_orf.exons[j].end << ",";
+			file << my_orf.exons[j].start+1 << "-" << my_orf.exons[j].end+1 << ",";
 		}
 		
 		file <<" "<<my_orf.orf_length<<" "<<my_orf.antisense_gene<<" "<<my_orf.CDS_intersect<<" "<<my_orf.chr_str;
@@ -1964,8 +1964,8 @@ void find_intersect_ann(vector<CandidateORF> &orfs, vector<GTF> &anns, map<strin
 			}
 		}
 	}
-	cout << "\nCanonical genes: " << to_string(canonical_count);
-	cout << "\nSpliced gene overlaps: " << to_string(splice_count);
+	//cout << "\nCanonical genes: " << to_string(canonical_count);
+	//cout << "\nSpliced gene overlaps: " << to_string(splice_count);
 
 }
 
@@ -2157,9 +2157,9 @@ void read_genes(vector<GeneModel> & gene_models,string filename, bool annotated_
 		//my_gene_model.transcript_id = column_data[2];
 		my_gene_model.gene_id = column_data[2];
 		my_gene_model.chr = stoi(column_data[3]);
-		my_gene_model.strand = stoi(column_data[4]);
-		my_gene_model.start_codon_pos = stoi(column_data[5]);
-		my_gene_model.stop_codon_pos = stoi(column_data[6]);
+		my_gene_model.strand = strandchar[column_data[4]];
+		my_gene_model.start_codon_pos = stoi(column_data[5])-1;
+		my_gene_model.stop_codon_pos = stoi(column_data[6])-1;
 		my_gene_model.orf_length = stoi(column_data[8]);
 
 		vector<string> exons;
@@ -2170,8 +2170,8 @@ void read_genes(vector<GeneModel> & gene_models,string filename, bool annotated_
 			Exon my_exon = Exon();
 			vector<string> exon_string;
 			split(exons[i], '-', exon_string);
-			my_exon.start = stoi(exon_string[0]);
-			my_exon.end = stoi(exon_string[1]);
+			my_exon.start = stoi(exon_string[0])-1;
+			my_exon.end = stoi(exon_string[1])-1;
 			my_gene_model.exons.emplace_back(my_exon);
 
 		}
@@ -3498,7 +3498,7 @@ if(runMode=="GetCandidateORFs")
     start = std::chrono::high_resolution_clock::now();
 
     ofstream file(output_dir + "all_orfs");
-	file << "id transcript_id gene_id chr strand orf_start orf_stop genomic_coordinates orf_length antisense_gene CDS_intersect chr_str";
+	file << "CandidateORF_ID Transcript_ID Gene_ID contig strand ORF_start ORF_stop genomic_coordinates ORF_length antisense_gene gene_intersect contig_str";
 	file.close();
 	int orf_index = 0;
     print_genes(orfs, output_dir + "all_orfs",0, orf_index);
@@ -3511,7 +3511,7 @@ if(runMode=="GetCandidateORFs")
 	//filter_longest_and_canonical(orfs, false);
     finish = std::chrono::high_resolution_clock::now();
     elapsed = finish - start;
-    cout << "\nfilter longest and canonical took: " << elapsed.count() << " s";
+   // cout << "\nfilter longest and canonical took: " << elapsed.count() << " s";
 	
 
     start = std::chrono::high_resolution_clock::now();
@@ -3590,7 +3590,7 @@ if(runMode=="GetCandidateORFs")
 
     start = std::chrono::high_resolution_clock::now();
     ofstream file(output_dir + "candidate_orfs"); // Open the file in append mode
-	file << "id transcript_id gene_id chr strand orf_start orf_stop genomic_coordinates orf_length antisense_gene CDS_intersect chr_str";
+	file << "CandidateORF_ID Transcript_ID Gene_ID contig strand ORF_start ORF_stop genomic_coordinates ORF_length antisense_gene gene_intersect contig_str";
 	file.close();
 	int orf_index = 0;
     print_genes(orfs, output_dir + "candidate_orfs",0, orf_index);
