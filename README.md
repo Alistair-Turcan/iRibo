@@ -64,6 +64,21 @@ Options:
 - --Output=path/to/output_folder: Specify output directory.
 - --Threads=1: Set number of threads.
 
+The columns of candidate_orfs and all_orfs can be interpreted as such:
+- CandidateORF_ID: index of the ORF
+- Transcript_ID: ID of the transcript the ORF is on
+- Gene_ID: The name of the gene, if canonical. X otherwise
+- contig: Index form of contig/chromosome the ORF is on.
+- strand: Strand the ORF is on.
+- ORF_coord1: First coordinate of the ORF
+- ORF_coord2: Second coordinate of the ORF
+- genomic_coordinates: Coordinates of the ORF. The start and stop position within each exon of the ORF, separated by -.
+- ORF_length: Exonic length of the ORF.
+- antisense_gene: Protein-coding gene on the antisense strand, if any. X otherwise.
+- gene_intersect: Protein-coding gene overlap, if any. X otherwise.
+- contig_str: String form of contig/chromosome the ORF is on.
+
+
 ------------------------------------------------------------------------------
 
 ## GenerateTranslationProfile:
