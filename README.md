@@ -55,6 +55,7 @@ Note:
 Begin by generating candidate ORFs for translation assessment. This results in two files:
 - candidate_orfs: A list of all candidate ORFs that will be assessed for translation. This is filtered due to overlapping translation signals being hard to separate.
 - all_orfs: A list of every possible ORF that exists in the genome or transcriptome.
+- candidate_orfs.gff3: Annotations of all candidate ORFs, ready to be put into a genome browser like IGV.
 
 ./iRibo --RunMode=GetCandidateORFs --Genome=path/to/genome.fa --Annotations=path/to/annotations.gtf
 
@@ -72,7 +73,6 @@ Generate a genome-wide translation profile using aligned ribo-seq reads. This ph
 - null_distribution: Null distribution read statistics per ORF.
 - all_passed_reads_f: Quality-passed forward strand reads.
 - all_passed_reads_r: Quality-passed reverse strand reads (similar to forward).
-- candidate_orfs.gff3: Annotations of all ORFs.
 - all_passed_reads_f.wig: Tracks of forward strand reads.
 - all_passed_reads_r.wig: Tracks of reverse strand reads.
 
@@ -106,6 +106,7 @@ This final step creates the translatome, yielding:
 - translated_orfs.csv: Data on translated ORFs.
 - nORF_discovery.png: Graph for p-values of real vs. scrambled nORFs and FDR cutoff.
 - cORF_discovery.png: Graph for p-values of real vs. scrambled cORFs and FDR cutoff.
+- translated_orfs.gff3: Annotations of all translated ORFs, ready to be put into a genome browser like IGV.
 
 To run:
 Rscript GenerateTranslatome.R --TranslationCalls=path/to/translation_calls --NullDistribution=path/to/null_distribution --CandidateORFs=path/to/candidate_orfs
