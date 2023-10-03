@@ -43,7 +43,7 @@ iRibo takes in:
 4. Aligned ribo-seq reads in SAM or BAM format.
 
 Recommendation: 
-- Trim low-quality reads and adapters from ribo-seq samples in fastq format for best alignment.
+- Trim low-quality reads and adapters from ribo-seq samples in FASTQ format for best alignment.
 
 Note:
 - Ensure genome, annotations, and transcriptome have consistent chromosome identifiers, e.g., >chr1 in genome should match chr1 in annotations.
@@ -108,7 +108,7 @@ Options:
 - --Threads=1: Set thread count.
 - --Min_Length=25: Minimum read length for quality control.
 - --Max_Length=35: Maximum read length for quality control.
-- --P_Site_Distance=20: Max distance to check for a p-site.
+- --P_Site_Distance=20: Max distance to check for a P-site.
 - --QC_Count=10000: Number of reads in the first frame for quality control.
 - --QC_Periodicity=2.0: Periodicity scale in canonical genes for quality control.
 - --QC_Positions=false: Use positions or read counts in quality control.
