@@ -43,7 +43,7 @@ iRibo takes in:
 4. Aligned ribo-seq reads in SAM or BAM format.
 
 Recommendation: 
-- Trim low-quality reads and adaptors from ribo-seq samples in fastq format for best alignment.
+- Trim low-quality reads and adapters from ribo-seq samples in fastq format for best alignment.
 
 Note:
 - Ensure genome, annotations, and transcriptome have consistent chromosome identifiers, e.g., >chr1 in genome should match chr1 in annotations.
