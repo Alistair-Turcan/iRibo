@@ -52,7 +52,7 @@ Note:
 
 ## GetCandidateORFs:
 
-Begin by generating candidate ORFs for translation assessment. This results in two files:
+Begin by generating candidate ORFs for translation assessment. This results in three files:
 - candidate_orfs: A list of all candidate ORFs that will be assessed for translation. This is filtered due to overlapping translation signals being hard to separate.
 - all_orfs: A list of every possible ORF that exists in the genome or transcriptome.
 - candidate_orfs.gff3: Annotations of all candidate ORFs, ready to be put into a genome browser like IGV.
