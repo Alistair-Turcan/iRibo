@@ -44,6 +44,7 @@ iRibo takes in:
 
 Recommendation: 
 - Trim low-quality reads and adapters from ribo-seq samples in FASTQ format for best alignment.
+- Choose a transcriptome that is as comprehensive as possible, for both read mapping and iRibo.
 
 Note:
 - Ensure genome, annotations, and transcriptome have consistent chromosome identifiers, e.g., >chr1 in genome should match chr1 in annotations.
