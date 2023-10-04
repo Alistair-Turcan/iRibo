@@ -347,7 +347,7 @@ combined_indices <- sapply(combined_indices_temp, function(x) x - 1)
 line_number <- 0
 
 # Open the input file for reading
-input_dir <- basename(orfs_file)
+input_dir <- dirname(orfs_file)
 input_file <- file(paste(input_dir, "candidate_orfs.gff3", sep = ""), "r")
 
 # Open the output file for writing
