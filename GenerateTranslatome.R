@@ -1,62 +1,35 @@
 time1 = Sys.time()
+library(argparse)
+library(scales)
+library(parallel)
+library(ggplot2)
+library("future.apply")
 
-# Function to parse command line arguments
-parseArguments <- function(args) {
-  arguments <- list()
-  
-  for(i in 2:length(args)) {
-    arg <- args[[i]]
-    
-    if(substr(arg, 1, 2) == "--") {
-      delimiterPos <- regexpr("=", arg)
-      if(delimiterPos != -1) {
-        key <- substr(arg, 3, delimiterPos - 1)
-        value <- substr(arg, delimiterPos + 1, nchar(arg))
-        arguments[[key]] <- value
-		print(key)
-      } else {
-        key <- substr(arg, 3, nchar(arg))
-        arguments[[key]] <- ""
-      }
-    }
-  }
-  
-  return(arguments)
-}
+args <- ArgumentParser("iRibo Generate Translatome step")
+args$add_argument("--TranslationCalls", help="Path to translation_calls file", type="character", required=TRUE)
+args$add_argument("--CandidateORFs", help="Path to candidate_orfs file", type="character", required=TRUE)
+args$add_argument("--NullDistribution", help="Path to null_distribution file", type="character", required=TRUE)
+args$add_argument("--ExcludeCHR", help="Chromosomes or contigs to exclude. Default is none", type="character", default="")
+args$add_argument("--Threads", help="Number of threads to use. Default is 1", type="integer", default=1)
+args$add_argument("--Scrambles", help="Number of scrambles to calculate FDR. Default is 100", type="integer", default=100)
+args$add_argument("--ExcludeOverlapGene", help="Exclude nORFs overlapping canonical genes on the same strand. Default value is True", type='logical', default=TRUE)
+args$add_argument("--FDR", help="False discovery rate. Default is 0.05", type='double', default=0.05)
+args$add_argument("--Output", help="Path to output directory", type='character')
+argv <- args$parse_args()
 
-# Function to retrieve argument value with a default or stop execution if mandatory and not specified
-getArg <- function(arguments, arg, defaultValue, mandatory = FALSE) {
-  if(arg %in% names(arguments)) {
-    return(arguments[[arg]])
-  } else {
-    if(mandatory) {
-      stop(paste("Argument", arg, "is required but not specified."))
-    } else {
-      return(defaultValue)
-    }
-  }
-}
+print(argv)
 
-
-
-args <- commandArgs(trailingOnly = FALSE)
-parsedArgs <- parseArguments(args)
-
-calls_file <- getArg(parsedArgs, "TranslationCalls", "", TRUE)
-orfs_file <- getArg(parsedArgs, "CandidateORFs", "", TRUE)
-null_file <- getArg(parsedArgs, "NullDistribution", "", TRUE)
-
-threads <- as.integer(getArg(parsedArgs, "Threads", "1", FALSE))
-num_scrambles <- as.integer(getArg(parsedArgs, "Scrambles", "100", FALSE))
-if(num_scrambles>100){
-	num_scrambles=100
-}
-exclude_chr_input <- getArg(parsedArgs, "ExcludeCHR", "", FALSE)
+calls_file <- argv$TranslationCalls
+orfs_file <- argv$CandidateORFs
+null_file <- argv$NullDistribution
+threads <- argv$Threads
+num_scrambles <- argv$Scrambles
+exclude_overlap_gene <- argv$ExcludeOverlapGene
+FDR <- argv$FDR
+exclude_chr_input <- argv$ExcludeCHR
 exclude_chr <- strsplit(exclude_chr_input, ",")[[1]]
 
-exclude_overlap_gene <- tolower(getArg(parsedArgs, "ExcludeOverlapGene", "", FALSE))
-
-output_dir <- getArg(parsedArgs, "Output", "", FALSE)
+output_dir <- argv$Output
 
 if(output_dir!=""){
 	dir.create(output_dir, showWarnings = FALSE)
@@ -73,12 +46,6 @@ orfs <- read.csv(orfs_file, sep=" ", header=TRUE, stringsAsFactors=F)
 
 nulldist<-read.csv(null_file,sep=" ",stringsAsFactors=F)
 
-FDR  <- as.numeric(getArg(parsedArgs, "FDR", "0.05", FALSE))
-
-library(scales)
-library(parallel)
-library(ggplot2)
-library("future.apply")
 
 plan(multicore, workers = threads) #Enables multithreading
 
@@ -90,11 +57,13 @@ options(future.globals.maxSize = 10000 * 1024^2) # 600 MiB
 
 # Define a function to calculate the binom.test for a single index i
 #For scrambled ORFs
-calc_binom_false <- function(i) {
+calc_binom_false <- function(i, num_scrambles) {
   temp_call <- nulldist[i,]  # Changed from calls to nulldist
-  p_values <- numeric(100)  # Initialize vector to store p-values
+  p_values <- numeric(num_scrambles)  # Initialize vector to store p-values
+  
+  num_bins <- num_scrambles-1
 
-  for (j in 0:99) {  # For each scrambled bin
+  for (j in 0:num_bins) {  # For each scrambled bin
     scrambled_bin <- paste0("scrambled", j)  # Column name for scrambled bin
     scrambled_sum_bin <- paste0("scrambled_sum", j)  # Column name for scrambled sum bin
     scrambled_sum = temp_call[[scrambled_sum_bin]]
@@ -112,7 +81,7 @@ calc_binom_false <- function(i) {
 clusterExport(cl = makeCluster(threads), varlist = c("calls"))
 
 # Use future_lapply to apply the calc_binom_false function to each index in parallel
-results <- future_lapply(1:length(orfs[,1]), calc_binom_false)
+results <- future_lapply(1:length(orfs[,1]), calc_binom_false, num_scrambles=num_scrambles)
 
 #print(Sys.time() - time1)
 time1 = Sys.time()
@@ -142,7 +111,7 @@ calc_binom_true <- function(i) {
 }
 
 
-# Use future_lapply to apply the calc_binom_false function to each index in parallel
+# Use future_lapply to apply the calc_binom_true function to each index in parallel
 results <- future_lapply(1:length(orfs[,1]), function(i) calc_binom_true(i))
 
 # Combine the results into a single vector
@@ -170,7 +139,7 @@ canonical_index <- which(orfs$Gene_ID != "X")
 noncanonical_index <- which(orfs$Gene_ID == "X")
 #print(length(noncanonical_index))
 
-if(exclude_overlap_gene == "true"){
+if(exclude_overlap_gene == TRUE){
 	print("Excluding Overlapping nORFs")
 	noncanonical_index <- intersect(noncanonical_index, which(orfs$gene_intersect == "X"))
 
@@ -200,21 +169,21 @@ scrambled_hits_canonical<-array()
 #number of true hits and scrambled (negative control) hits at range of pval thresholds, used to calculate FDR
 
 # Define a function to calculate the hits and scrambled hits at a given pval threshold
-calc_hits <- function(i, ribo_bin, scram_bin, index) {
+calc_hits <- function(i, ribo_bin, scram_bin, num_scrambles, index) {
   num_hits <- length(which(ribo_bin[index] < i/10000))
   scrambled_hits <- 0
-  for(j in 1:100) {
+  for(j in 1:num_scrambles) {
     scrambled_hits <- scrambled_hits + length(which(scram_bin[index, j] < i/10000))
   }
-  scrambled_hits <- scrambled_hits / 100
+  scrambled_hits <- scrambled_hits / num_scrambles
   return(list(num_hits = num_hits, scrambled_hits = scrambled_hits))
 }
 
 
 # Use future_lapply to apply the calc_hits function to each pval threshold in parallel
 results <- future_lapply(1:2000, function(i) {
-  num_noncanonical <- calc_hits(i, ribo_bin, scram_bin, noncanonical_index)
-  num_canonical <- calc_hits(i, ribo_bin, scram_bin, canonical_index)
+  num_noncanonical <- calc_hits(i, ribo_bin, scram_bin, num_scrambles, noncanonical_index)
+  num_canonical <- calc_hits(i, ribo_bin, scram_bin, num_scrambles, canonical_index)
   return(list(num_noncanonical = num_noncanonical, num_canonical = num_canonical))
 })
 
