@@ -31,6 +31,7 @@ A comprehensive tool for integrating ribosome profiling data to detect genome wi
 
 - Dependencies: 
   R version 4.2.2 is necessary. Download and documentation are available at https://www.r-project.org/.
+  Samtools. Download and documentation are available at https://www.htslib.org/. 
 
 ------------------------------------------------------------------------------
 
@@ -119,7 +120,7 @@ Options:
 ## GenerateTranslatome:
 
 This final step creates the translatome, yielding:
-- translated_orfs.csv: Data on translated ORFs. Adds 3 new columns for in-frame read count, expression level (length/in-frame read count), and p-value of discovery.
+- translated_orfs.csv: Data on translated ORFs. The same output format as candidate_orfs, but with 3 new columns for in-frame read count, expression level (length/in-frame read count), and p-value of discovery.
 - nORF_discovery.png: Graph for p-values of real vs. scrambled nORFs and FDR cutoff.
 - cORF_discovery.png: Graph for p-values of real vs. scrambled cORFs and FDR cutoff.
 - translated_orfs.gff3: Annotations of all translated ORFs, ready to be put into a genome browser like IGV.
@@ -130,9 +131,9 @@ Rscript GenerateTranslatome.R --TranslationCalls=path/to/translation_calls --Nul
 Options:
 - --Output=path/to/output_folder: Designate output directory.
 - --Threads=1: Specify thread count.
-- --ExcludeChr=chr1,chr8: Chromosomes/contigs to exclude. Default is none.
+- --ExcludeChr=none: Chromosomes/contigs to exclude. Default is none. Example: --ExcludeChr=chr1,chr8,chrM
 - --ExcludeOverlapGene=True: Exclude nORFs overlapping canonical genes on the same strand.
 - --FDR=0.05: Define desired false discovery rate.
-- --Scrambles=100: Set number of scrambles to calculate FDR.
+- --Scrambles=100: Set number of scrambles to calculate FDR. WIll run faster with less scrambles, if enough data is processed to maintain robustness.
 
 ------------------------------------------------------------------------------
