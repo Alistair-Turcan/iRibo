@@ -118,7 +118,7 @@ Options:
 ## GenerateTranslatome:
 
 This final step creates the translatome, yielding:
-- translated_orfs.csv: Data on translated ORFs.
+- translated_orfs.csv: Data on translated ORFs. Adds 3 new columns for in-frame read count, expression level (length/in-frame read count), and p-value of discovery.
 - nORF_discovery.png: Graph for p-values of real vs. scrambled nORFs and FDR cutoff.
 - cORF_discovery.png: Graph for p-values of real vs. scrambled cORFs and FDR cutoff.
 - translated_orfs.gff3: Annotations of all translated ORFs, ready to be put into a genome browser like IGV.
