@@ -737,6 +737,7 @@ void read_gtf_original(vector<GTF> &gtfs, string filename, map<string,int> &chr_
 	}
 }
 
+
 void read_gtf(vector<GTF> &gtfs, string filename, map<string,int> &chr_labels, bool includes_chr_prefix, int threads)
 {
     // Read the whole file
@@ -1969,7 +1970,61 @@ void find_intersect_ann(vector<CandidateORF> &orfs, vector<GTF> &anns, map<strin
 
 }
 
+void read_annotations(vector<GTF> &gtfs, string filename, map<string,int> &chr_labels, bool includes_chr_prefix)
+{
+	int index=0;
+	ifstream file(filename);
+	string line;
+	while (getline(file, line))
+	{
 
+		if (line[0] != '#')
+		{
+			vector<string> columns;
+			split(line, '\t', columns);
+
+			if(!chr_labels.count(columns[0]))
+			{
+				continue;
+			}
+			gtfs.push_back(GTF());
+			gtfs.back().chr = chr_labels.at(columns[0]);
+			gtfs.back().contig = columns[0];
+			
+			gtfs.back().source = columns[1];
+			gtfs.back().annotation_type = columns[2];
+
+			gtfs.back().start = stoi(columns[3])-1;
+
+			gtfs.back().end = stoi(columns[4])-1;
+			if (columns[6] == "+")
+			{
+				gtfs.back().strand = 0;
+			}
+			else
+			{
+				gtfs.back().strand = 1;
+			}
+			vector<string> info;
+			split(columns[8], ' ', info);
+			for (int i = 0; i < info.size(); i += 2)
+			{
+				if (info[i] == "gene_id")
+				{
+					gtfs.back().gene_id = info[i + 1].substr(1, info[i + 1].size() - 3);
+				}
+				if (info[i] == "transcript_id")
+				{
+					gtfs.back().transcript_id = info[i + 1].substr(1, info[i + 1].size() - 3);
+				}
+				if(info[i] == "ccds_id")
+				{
+					gtfs.back().ccds_id = info[i + 1].substr(1, info[i + 1].size() - 3);
+				}
+			}
+		}
+	}
+}
 
 void assemble_cds(map<string,CDS> &cds,const vector<GTF> &gtfs)
 {
@@ -3196,6 +3251,57 @@ void accumulate_reads(int threads,
 	}
 }
 
+void output_gff(vector<CandidateORF>& orfs, map<string, int>& chr_labels, string& output_dir, int strand, int &orf_index){
+    ofstream file(output_dir + "candidate_orfs.gff3", std::ios::app);
+
+    // Construct rev_chr_labels once
+    map<int,string> rev_chr_labels;
+    for(auto& kv : chr_labels)
+    {
+        rev_chr_labels[kv.second] = kv.first;
+    }
+	string buffer_file;
+    for(int i=0;i<orfs.size();i++)
+    {
+        CandidateORF& my_orf = orfs[i];
+		
+		if(my_orf.strand!=strand){
+			continue;
+		}
+		int phase = 0;
+		if(my_orf.strand==0)
+		{
+			for(int j=0;j<my_orf.exons.size();j++)
+			{
+				if(j>0)
+				{
+					phase+=(1+my_orf.exons[j-1].end-my_orf.exons[j-1].start)%3;
+					phase=phase%3;
+				}
+				buffer_file += rev_chr_labels[my_orf.chr] + "\tiRibo\tCDS\t" + std::to_string(my_orf.exons[j].start+1) + "\t" + std::to_string(my_orf.exons[j].end+1) + "\t.\t";
+				buffer_file += (my_orf.strand==0 ? "+" : "-");
+				buffer_file += "\t" + std::to_string((3-phase)%3) + "\tID=candidate_orf" + std::to_string(orf_index) + "\n";
+			}
+		}
+		else if(my_orf.strand==1)
+		{
+			for(int j=my_orf.exons.size()-1;j>=0;j--)
+			{
+				if(j<my_orf.exons.size()-1)
+				{
+					phase+=(1+my_orf.exons[j+1].end-my_orf.exons[j+1].start)%3;
+					phase=phase%3;
+				}
+				buffer_file += rev_chr_labels[my_orf.chr] + "\tiRibo\tCDS\t" + std::to_string(my_orf.exons[j].start+1) + "\t" + std::to_string(my_orf.exons[j].end+1) + "\t.\t";
+				buffer_file += (my_orf.strand==0 ? "+" : "-");
+				buffer_file += "\t" + std::to_string((3-phase)%3) + "\tID=candidate_orf" + std::to_string(orf_index) + "\n";
+			}			
+		}
+		orf_index++;
+        file << buffer_file;
+        buffer_file = ""; //clear the buffer
+    }   
+}
 void outputTracks(vector<map<int,int>>& passed_reads_f, vector<map<int,int>>& passed_reads_r, vector<GeneModel>& orfs, map<string, int>& chr_labels, string& output_dir){
 
     // Construct rev_chr_labels once
@@ -3207,7 +3313,6 @@ void outputTracks(vector<map<int,int>>& passed_reads_f, vector<map<int,int>>& pa
     
     ofstream file_plus(output_dir + "riboseq_reads_plus.wig");
     ofstream file_minus(output_dir + "riboseq_reads_minus.wig");
-    ofstream file(output_dir + "candidate_orfs.gff3");
     
     string buffer_plus, buffer_minus, buffer_file;
         
@@ -3230,6 +3335,7 @@ void outputTracks(vector<map<int,int>>& passed_reads_f, vector<map<int,int>>& pa
         buffer_minus = ""; //clear the buffer
     }
     
+	/*
     for(int i=0;i<orfs.size();i++)
     {
         GeneModel& my_orf = orfs[i];
@@ -3265,6 +3371,7 @@ void outputTracks(vector<map<int,int>>& passed_reads_f, vector<map<int,int>>& pa
         file << buffer_file;
         buffer_file = ""; //clear the buffer
     }   
+	*/
 }
 
 //Print all the scrambles
@@ -3599,6 +3706,12 @@ if(runMode=="GetCandidateORFs")
     elapsed = finish - start;
     cout << "\nprint_genes took: " << elapsed.count() << " s";
     
+    ofstream file2(output_dir + "candidate_orfs.gff3"); // Open the file in append mode
+
+	int output_index =0;
+	output_gff(orfs, chr_labels, output_dir, 0, output_index);
+	output_gff(orfs, chr_labels, output_dir, 1, output_index);
+
     cout << "\nprinted files";
 }
 
