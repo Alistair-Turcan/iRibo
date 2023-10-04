@@ -133,5 +133,6 @@ Options:
 - --ExcludeChr=chr1,chr8: Chromosomes/contigs to exclude. Default is none.
 - --ExcludeOverlapGene=True: Exclude nORFs overlapping canonical genes on the same strand.
 - --FDR=0.05: Define desired false discovery rate.
+- --Scrambles=100: Set number of scrambles to calculate FDR.
 
 ------------------------------------------------------------------------------
