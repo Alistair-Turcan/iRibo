@@ -107,10 +107,10 @@ sam_dir/SRR1042855_aligned.out.bam
 Options:
 - --Output=path/to/output_folder: Define output directory.
 - --Threads=1: Set thread count.
-- --Min_Length=25: Minimum read length for quality control.
-- --Max_Length=35: Maximum read length for quality control.
-- --P_Site_Distance=20: Max distance to check for a P-site.
-- --QC_Count=10000: Number of reads in the first frame for quality control.
+- --Min_Length=25: Minimum read length for quality control. Most riboseq reads are between length 25-35nt, but can vary by experiment.
+- --Max_Length=35: Maximum read length for quality control. Most riboseq reads are between length 25-35nt, but can vary by experiment.
+- --P_Site_Distance=20: Max distance to check for a P-site. Most p-sites are below 20. If you have a reason to think it could be longer, can be increased.
+- --QC_Count=10000: Number of reads in the first frame of protein-coding genes for quality control.
 - --QC_Periodicity=2.0: Periodicity scale in canonical genes for quality control.
 - --QC_Positions=false: Use positions or read counts in quality control.
 
