@@ -348,7 +348,7 @@ line_number <- 0
 
 # Open the input file for reading
 input_dir <- dirname(orfs_file)
-input_file <- file(paste(input_dir, "candidate_orfs.gff3", sep = ""), "r")
+input_file <- file(file.path(input_dir, "candidate_orfs.gff3"), "r")
 
 # Open the output file for writing
 output_file <- file(paste(output_dir, "translated_orfs.gff3", sep = ""), "w")
