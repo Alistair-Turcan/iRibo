@@ -31,6 +31,7 @@ A comprehensive tool for integrating ribosome profiling data to detect genome wi
 
 - Dependencies: 
   R version 4.2.2 is necessary. Download and documentation are available at https://www.r-project.org/.
+
   Samtools. Download and documentation are available at https://www.htslib.org/. 
 
 ------------------------------------------------------------------------------
@@ -90,8 +91,8 @@ Generate a genome-wide translation profile using aligned ribo-seq reads. This ph
 - null_distribution: Null distribution read statistics per ORF.
 - all_passed_reads_f: Quality-passed forward strand reads.
 - all_passed_reads_r: Quality-passed reverse strand reads (similar to forward).
-- all_passed_reads_f.wig: Tracks of forward strand reads.
-- all_passed_reads_r.wig: Tracks of reverse strand reads.
+- riboseq_reads_plus.wig: Tracks of forward strand reads.
+- riboseq_reads_minus.wig: Tracks of reverse strand reads.
 
 To run:
 ./iRibo --RunMode=GenerateTranslationProfile --Genome=path/to/genome.fa --Riboseq=path/to/sams.txt --CandidateORFs=path/to/candidate_orfs
