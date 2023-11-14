@@ -30,7 +30,7 @@ A comprehensive tool for integrating ribosome profiling data to detect genome wi
   - Storage: At least 100GB
 
 - Dependencies: 
-  R version 4.2.2 is necessary. Download and documentation are available at https://www.r-project.org/.
+  R version 4.2.2 or above is necessary. Download and documentation are available at https://www.r-project.org/.
 
   Samtools. Download and documentation are available at https://www.htslib.org/. 
 
@@ -115,6 +115,23 @@ Options:
 - --QC_Count=10000: Number of reads in the first frame of protein-coding genes for quality control.
 - --QC_Periodicity=2.0: Periodicity scale in canonical genes for quality control.
 - --QC_Positions=false: Use positions or read counts in quality control.
+
+The columns of translation_calls are:
+- index: The index (0-based) of the orf in the candidate_orfs file used.
+- frame0: How often the first frame is the biggest in the orf, when any frame is the biggest. This is the number of successes in the binomial test for translation.
+- frame_sum: The total sum of how often any frame is the biggest in the orf, if any. This is the number of trials in the binomial test for translation.
+- reads0, reads1, reads2: The total count of reads mapping to the first, second, and third frames of the orf, respectively.
+
+The columns of null_distribution are:
+- scrambledX: Where X is a number 0-99, and contains how often the first frame is the biggest in that scramble of the orf, when any frame is the biggest.
+- scrambled_sumX: The total sum of how often any frame is the biggest in that scrambled orf, if any.
+
+The columns of all_passed_reads_f and all_passed_reads_r are:
+- chr: The index of the chromosome for the read, in the order that chromosome appears in the genome.
+- strand: The strand the read aligns to, 0 for forward, 1 for reverse.
+- pos: The genomic position of the start of the read.
+- count: How many reads map to this chr, strand, pos.
+
 
 ------------------------------------------------------------------------------
 
